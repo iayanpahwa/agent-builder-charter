@@ -1,0 +1,75 @@
+# Reference charter: a scraping agent that fetches product pages and records prices.
+# Filled out end to end. Validate it against ../charter.schema.yaml.
+
+charter: "0.2"
+
+runtime: standalone       # tools are standalone verbs, not Claude Code tool names
+
+id: price-watch-scraper
+version: "4"
+
+owner:
+  team: web-data-platform
+  on_call: "@web-data-oncall"
+  escalation: "owner@example.com"
+
+status: enabled
+
+context:
+  trusted_sources:
+    - prompts/price-watch-scraper.system.md
+    - prompts/parsing-rules.md
+  # Pages this agent fetches, and its own memory, are untrusted automatically.
+
+model:
+  provider: anthropic
+  id: claude-haiku-4-5
+  params:
+    temperature: 0
+    max_tokens: 4096
+
+sandbox:
+  isolation: container      # normal isolation (strength axis)
+  filesystem: /scratch      # scratch folder only
+  persist_state: false      # thrown away after each run (lifetime axis)
+
+budget:
+  usd: 0.50
+  tokens: 200000
+  steps: 40
+  wall_clock_seconds: 300
+
+tools:
+  - fetch_url
+  - parse_html
+  - write_price_record
+
+credentials:
+  - name: price-db
+    ref: "vault://web-data/price-db-writer"
+    scope: "insert-only on table prices"
+
+egress:
+  - "*.example-retailer.com"
+  - "api.internal.example.com"
+
+approval_tier:
+  auto:
+    - fetch
+    - parse
+    - write_price_record
+  human_approval:
+    - purge_table           # destructive, never automatic
+
+data:
+  class: internal
+  retention_days: 30
+  redact:
+    - api_key
+    - cookie
+
+evals:
+  suite: "evals/price-watch/cases.yaml"
+  success_metric:
+    name: "percent of pages parsed correctly"
+    slo: "97%"

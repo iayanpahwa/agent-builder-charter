@@ -1,0 +1,313 @@
+# CHARTER — agent manifest schema (v0.2)
+#
+# One charter.yaml per agent. The system that runs the agent loads this file and
+# is the ONLY way the agent gets a model, tools, secrets, network, or a place to
+# run. If it is not written here, the agent cannot do it.
+#
+# Enforcement tags (see x-enforced on each field):
+#   R   the runtime blocks or kills the run if this is broken (a hard wall)
+#   CI  checked before release; a failure blocks the deploy
+#   P   must be present and filled in; the registry rejects a blank one
+#   AL  wired to an alarm; the owner gets paged if it is breached
+#
+# This file is JSON Schema written in YAML, so it can validate real charters.
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://charter.dev/schema/v0.2"
+title: CHARTER agent manifest
+type: object
+additionalProperties: false
+required:
+  [charter, id, version, owner, status, context, model, sandbox, budget,
+   tools, credentials, egress, approval_tier, data, evals]
+
+properties:
+
+  # --- Spec version --------------------------------------------------------
+  charter:
+    type: string
+    const: "0.2"
+    description: >
+      Which version of the CHARTER schema this file was written against. Lets you
+      migrate a thousand files later without guessing what each one assumed.
+    x-enforced: P
+    x-runtime: The loader refuses a charter written for a schema version it does not understand.
+
+  # --- Where this agent runs (build input, NOT a runtime wall) -------------
+  runtime:
+    type: string
+    description: >
+      Which harness this agent is built for. Decides the vocabulary of `tools`
+      (e.g. claude-code uses WebSearch/WebFetch/Read; a standalone runtime uses your
+      own verbs like fetch_url). Well-known values: claude-code, standalone, headless.
+      Other values are allowed; a builder that does not recognize one treats it as
+      standalone. Optional, but the new-agent skill always sets it.
+    x-enforced: none
+    x-runtime: >
+      A hint the BUILDER reads to emit the right tool names — not a wall. A loader
+      that does not match this runtime should say so out loud, not silently ignore it.
+
+  # --- Responsibility: who owns it, and the off switch ---------------------
+  id:
+    type: string
+    description: >
+      Short unique name for this agent. One of a kind across the whole fleet.
+      Everything else (dashboards, the off switch, search) finds the agent by this.
+    x-enforced: P
+    x-runtime: Registry refuses a second agent with the same id.
+
+  version:
+    type: string
+    pattern: "^[0-9]+$"
+    description: >
+      Version of THIS file, e.g. "4". Bump it on every change. Lets you answer
+      "what was this agent allowed to do last Tuesday?"
+    x-enforced: P
+    x-runtime: Saved with every run, so each run is tied to the exact rules it ran under.
+
+  owner:
+    type: object
+    additionalProperties: false
+    required: [team, on_call, escalation]
+    description: >
+      Who is responsible when this agent misbehaves. An agent with no owner is the
+      single most common thing that goes wrong at scale.
+    properties:
+      team:       {type: string, description: The team that owns this agent.}
+      on_call:    {type: string, description: Who to page right now (a rotation handle or email).}
+      escalation: {type: string, description: Who to go to next if on-call cannot fix it.}
+    x-enforced: P
+    x-runtime: Deploy is blocked if any of these are blank. A human checks the content, not the machine.
+
+  status:
+    type: string
+    enum: [enabled, paused, killed]
+    description: >
+      The on/off switch. enabled runs; paused holds new runs; killed stops it for
+      good. Because it is a normal field you can search, you can turn off every
+      agent that matches a condition in one query.
+    x-enforced: R
+    x-runtime: Checked before every run. paused or killed means the run does not start.
+
+  # --- Context: what it is allowed to read as trusted ----------------------
+  context:
+    type: object
+    additionalProperties: false
+    required: [trusted_sources]
+    description: >
+      The only files the agent's instructions and rules may be built from — its
+      prompt manifest. Anything else it reads (a web page it fetches, its own past
+      memory) is treated as untrusted and is not allowed to act as an instruction.
+    properties:
+      trusted_sources:
+        type: array
+        items: {type: string}
+        description: The complete list of files the agent's prompt and rules are assembled from. If it is not here, it is not trusted.
+    x-enforced: R
+    x-runtime: >
+      The runtime tags everything the model reads as trusted or untrusted. Only
+      these files are trusted. Fetched pages and memory are always tagged untrusted,
+      cleaned, and marked with where they came from before they can be read again.
+
+  # --- Harness: the bounded box it runs in ---------------------------------
+  model:
+    type: object
+    additionalProperties: false
+    required: [provider, id]
+    description: The exact model the agent runs on, pinned so it cannot silently change under you.
+    properties:
+      provider: {type: string, description: "e.g. anthropic"}
+      id:       {type: string, description: "e.g. claude-opus-4-8"}
+      params:   {type: object, description: "Optional settings like temperature or max tokens."}
+    x-enforced: R
+    x-runtime: Loads exactly this model. If it is retired, the agent refuses to start instead of quietly using another one.
+
+  sandbox:
+    type: object
+    additionalProperties: false
+    required: [isolation]
+    description: >
+      The walled-off box the agent runs inside, so a mistake cannot spread or leave
+      lasting damage. This is the blast wall for its actual code and commands.
+    properties:
+      isolation:
+        type: string
+        enum: [none, container, microvm]
+        description: >
+          How walled-off the run is (a strength axis). none = shares the host (only
+          for trusted, read-only work). container = normal isolation. microvm =
+          strong isolation for risky work. Whether the box is thrown away after each
+          run is a separate axis — set persist_state for that.
+      filesystem:
+        type: string
+        description: Which files it can see or write, e.g. a scratch folder only.
+      persist_state:
+        type: boolean
+        description: Whether anything survives after the run ends. Default false.
+    x-enforced: R
+    x-runtime: Starts the agent inside this box. It cannot reach outside it.
+
+  budget:
+    type: object
+    additionalProperties: false
+    minProperties: 1
+    description: >
+      Hard ceilings on one run, so a stuck or runaway agent cannot rack up cost or
+      spin forever. At least one ceiling is required — an empty budget would fail
+      open, which defeats the point. (Open question for 24/7 agents: a per-run cap
+      is weak; a time window or aggregate cap is coming in the next revision.)
+    properties:
+      usd:                {type: number,  description: Max money for one run.}
+      tokens:             {type: integer, description: Max tokens for one run.}
+      steps:              {type: integer, description: Max loop steps for one run.}
+      wall_clock_seconds: {type: integer, description: Max real time for one run.}
+    x-enforced: R
+    x-runtime: When any ceiling is hit, the run is killed on the spot.
+
+  # --- Authority: what it is allowed to touch ------------------------------
+  tools:
+    type: array
+    items: {type: string}
+    description: The exact list of tools the agent may call. Nothing else is callable.
+    x-enforced: R
+    x-runtime: Any tool call not on this list is refused before it runs.
+
+  credentials:
+    type: array
+    description: >
+      The secrets the agent may use, given by reference (never the secret itself),
+      each scoped to the smallest role that does the job. This, not the tool list,
+      is the real limit on how much damage it can do.
+    items:
+      type: object
+      additionalProperties: false
+      required: [name, ref, scope]
+      properties:
+        name:  {type: string, description: "Friendly name, e.g. price-db."}
+        ref:   {type: string, description: Pointer to the secret in your vault, not the value.}
+        scope: {type: string, description: "The narrow role, e.g. read-only on table X."}
+    x-enforced: R
+    x-runtime: Hands the agent only these secrets, at only this scope. It never sees anything else.
+
+  egress:
+    type: array
+    minItems: 1
+    items: {type: string}
+    description: >
+      The web addresses the agent may connect to; everything else is blocked. Must
+      not be empty — a blank list is ambiguous (open on purpose, or just forgotten?).
+      To say "open on purpose", use `any` as the single, sole entry (`egress: [any]`);
+      then containment must come from elsewhere (read-only tools, no credentials), and
+      the builder's report will say egress is not-enforced. A bare `*` entry is not
+      allowed (use `any`); subdomain patterns like `*.example.com` are fine.
+    x-enforced: R
+    x-runtime: >
+      The network layer refuses any connection not on this list — unless the list is
+      exactly [any]. Your main guard against data being sent somewhere it should not.
+
+  # --- Plug-ins: extra capabilities, each declared so it goes through the door ---
+  mcp:
+    type: array
+    description: >
+      MCP servers to plug in. Each server's tools become `mcp__<name>__<tool>` and are
+      permitted per `allow`. An MCP server runs its OWN code and may hold its own network
+      access and secrets — a heavier trust surface than a built-in tool. The runner loads
+      ONLY these (`--mcp-config` + `--strict-mcp-config`), never ambient servers.
+    items:
+      type: object
+      additionalProperties: false
+      required: [name, server]
+      properties:
+        name:   {type: string, description: "Server name; its tools are mcp__<name>__<tool>."}
+        server: {type: object, description: "The mcpServers entry (type/command/args/url/env/headers). Put secrets as ${ENV_VAR} and declare them in credentials."}
+        allow:
+          type: array
+          items: {type: string}
+          description: 'Which of its tools to permit: ["*"] for all (default), or specific tool names.'
+    x-enforced: R
+    x-runtime: Only these servers are loaded (strict), and only their `allow` tools are added to the allow-list.
+
+  skills:
+    type: array
+    items: {type: string}
+    description: >
+      Names of on-disk Claude Code skills to make available (they must be discoverable —
+      user, project, or plugin). The runner restricts the run to ONLY these
+      (`settings.availableSkills`), so the agent can't reach every skill on the machine. A
+      skill is declared behaviour; list only what the job needs.
+    x-enforced: R
+    x-runtime: settings.availableSkills is set to exactly this list. (Version-dependent — see the CLI docs.)
+
+  approval_tier:
+    type: object
+    additionalProperties: false
+    description: Which kinds of action the agent can do on its own, and which need a human to say yes first.
+    properties:
+      auto:
+        type: array
+        items: {type: string}
+        description: "Action types it may do without asking, e.g. read, look up."
+      human_approval:
+        type: array
+        items: {type: string}
+        description: "Action types that must wait for a human OK, e.g. spend money, delete, send email."
+    x-enforced: R
+    x-runtime: An action in the human_approval list is held in a queue until a person approves it.
+
+  # --- Telemetry: what is watched and kept ---------------------------------
+  data:
+    type: object
+    additionalProperties: false
+    required: [class]
+    description: How sensitive the data this agent handles is, and how it must be kept and cleaned up.
+    properties:
+      class:
+        type: string
+        enum: [public, internal, confidential, pii]
+        description: Sensitivity level of the data it touches.
+      retention_days:
+        type: integer
+        description: How long its logs and records are kept before deletion.
+      redact:
+        type: array
+        items: {type: string}
+        description: "Things to hide from logs, e.g. emails, tokens."
+    x-enforced: R
+    x-runtime: Logs hide the listed items and are deleted after the retention window. Guards against secrets leaking into logs.
+
+  # --- Evals: how you know it works ----------------------------------------
+  evals:
+    type: object
+    additionalProperties: false
+    required: [suite, success_metric]
+    description: How you know the agent works before release and stays working after.
+    properties:
+      suite:
+        type: string
+        description: Pointer to the test set it must pass to ship.
+      success_metric:
+        type: object
+        additionalProperties: false
+        required: [name, slo]
+        properties:
+          name: {type: string, description: "The one number that says it is doing its job, e.g. percent of pages parsed correctly."}
+          slo:  {type: string, description: "The line it must stay above, e.g. 95%."}
+    x-enforced: "CI (suite) + AL (success_metric)"
+    x-runtime: >
+      The test set must pass or the release is blocked. In production, if the
+      success number drops below the line, the owner is paged.
+
+  # --- Escape hatch: declared, never enforced ------------------------------
+  extensions:
+    type: object
+    additionalProperties: true
+    description: >
+      A home for anything a team needs to record that the runtime does NOT enforce.
+      This keeps the enforced core small: extra data lives here, plainly on the
+      "advice, not a wall" side, instead of forcing a fork of the schema.
+      Well-known key: `human_verification: {expected: true, note: "..."}` — declares
+      that a human must check this agent's OUTPUT before it is trusted. The runtime
+      cannot force this, so it stays a declared expectation (the builder surfaces it
+      loudly), never a wall. Use it when output quality can't be auto-verified.
+    x-enforced: none
+    x-runtime: Ignored by the loader. Present only so extra fields have an honest home.
