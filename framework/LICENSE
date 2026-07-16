@@ -1,0 +1,19 @@
+The doctrine in this folder (framework/) is licensed under the
+
+    Creative Commons Attribution 4.0 International License (CC BY 4.0)
+
+Copyright 2026 Ayan Pahwa
+
+You are free to share and adapt this material for any purpose, even
+commercially, as long as you give appropriate credit, provide a link to
+the license, and indicate if changes were made.
+
+Human-readable summary:  https://creativecommons.org/licenses/by/4.0/
+Full legal code:         https://creativecommons.org/licenses/by/4.0/legalcode
+
+How to credit: name the project (agent-builder-charter) and link back to
+its repository or to https://codensolder.com. See ../CITATION.cff.
+
+Note: this CC BY 4.0 license covers the framework/ doctrine only. The code
+in the rest of the repository is licensed under the Apache License 2.0
+(see ../LICENSE).
