@@ -1,12 +1,29 @@
 # CHARTER: the doctrine
 
-*One page: what the framework is, **why** it exists, and **how** it works.*
+*One page: what we believe, **why** the framework exists, and **how** it works.*
 
 **A charter is a single file that ships with every agent and lists the only things that
 agent is allowed to do.** The system that runs the agent reads this file and is the *only*
 way it gets a model, tools, secrets, network, or a place to run. **If it isn't in the file,
 the agent can't do it.** It is not a document people are asked to read and follow. It is
 the gate every run passes through.
+
+---
+
+## What we believe
+
+Ten points. Each one maps to something the runtime actually does; none is decoration.
+
+1. **Every agent has an owner.** A named human on the hook for it. An unowned agent is the most common thing that goes wrong.
+2. **Every agent gets an isolated home.** Its own bounded sandbox with a pinned model, thrown away after the run, so one agent's mess stays its own.
+3. **An agent can only touch what it was granted.** The tools it may call, the sites it may reach, the secrets it may hold: all listed in the charter. If it isn't on the list, the agent can't do it.
+4. **Every agent has a hard ceiling.** A cap on steps, time, and spend, so a stuck or runaway agent stops on its own instead of running all night.
+5. **An agent trusts only its own instructions.** Its system prompt is built from sources you chose. Every page it fetches and everything it writes to memory is data, never a new order, no matter what that text says.
+6. **Dangerous actions wait for a human.** Anything destructive or public (dropping data, sending mail, posting) needs explicit approval and never fires on its own.
+7. **An agent has to prove it still works.** A test set it must pass to ship, and a live measure that pages its owner when quality slips. A charter makes an agent contained and owned, not correct.
+8. **Every agent can be watched and switched off.** Each run is logged, and a single write pauses one agent or the whole fleet.
+9. **The rules live in one file the runtime enforces.** The loader reads the charter and is the only door. A missing or broken charter means the agent doesn't start. We keep that enforced list small and never claim a control that nothing actually checks.
+10. **It's a menu, not a mandate.** Adopt as much as your scale needs; a smaller adoption is a real choice, not a failing grade. The one point we would never drop is the owner.
 
 ---
 
@@ -58,20 +75,6 @@ one or two are behaviours the runtime does the same way for everyone.
 *(The exact fields, and how strictly each is held, live in the manifestation's schema.)*
 
 ---
-
-## What we believe
-
-- **Earn every rule.** Keep the enforced list small; a rule earns its place only when the
-  system actually does something with it. Everything else is advice, not a wall.
-- **Never claim a control that nothing enforces.** Drop any control with eyes open, but the
-  file must not *say* it limits egress (or tools, or spend) while nothing checks. An honest
-  blank beats a hollow promise, because someone will trust the promise.
-- **It's a menu, not a mandate.** Adopt to your scale; a smaller adoption is a real choice,
-  not a failing grade. The one field worth keeping even at the most relaxed shape is
-  `owner`: an unowned agent is the most common thing that goes wrong.
-- **Contained is not correct.** A charter bounds what an agent *can do*, not whether it does
-  it *well*. "Has a charter" means *contained and owned*. It does not mean *safe*.
-  Correctness comes from evals and, where it matters, a human checking the output.
 
 ## How much to adopt (names, not levels; none is "more correct")
 
