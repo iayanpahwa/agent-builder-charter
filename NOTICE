@@ -1,0 +1,11 @@
+agent-builder-charter
+Copyright 2026 Ayan Pahwa
+
+This product includes software developed by Ayan Pahwa
+(https://codensolder.com).
+
+The code in this repository is licensed under the Apache License, Version 2.0.
+The doctrine in framework/ is licensed under CC BY 4.0 (see framework/LICENSE).
+
+If you use or build on this work, please keep this notice and credit the
+project (see CITATION.cff).

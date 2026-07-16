@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+title: "agent-builder-charter: an executable, runtime-enforced governance manifest for AI agents"
+message: "If you use this project or build on it, please cite it and keep attribution."
+type: software
+authors:
+  - family-names: Pahwa
+    given-names: Ayan
+    website: "https://codensolder.com"
+repository-code: "https://github.com/iayanpahwa/agent-builder-charter"
+url: "https://codensolder.com"
+abstract: >
+  CHARTER is a per-agent governance manifest (charter.yaml) that lists the only
+  things an agent may do: model, tools, budget, network egress, credentials,
+  approvals, data handling, and evals. A runtime loader reads the charter and is
+  the only door: anything not on the file is blocked. The project ships a
+  framework-neutral core plus builders that turn a charter into an enforced,
+  runnable agent (the first builder runs agents headless via claude -p).
+keywords:
+  - ai-agents
+  - agent-governance
+  - llm-safety
+  - claude-code
+  - guardrails
+license: Apache-2.0

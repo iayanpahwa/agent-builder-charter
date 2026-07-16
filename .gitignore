@@ -1,0 +1,20 @@
+# Python bytecode
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# Background reading — not part of the shipped project.
+research/
+
+# Generated / runtime artifacts. The skills in builder/.claude/skills/ ARE committed
+# (you get them on clone); only generated + per-run files are ignored.
+builders/claude-headless/.claude/settings.json
+builders/claude-headless/.claude/settings.local.json
+builders/*/agents/*/logs/
+
+# Stray dir the harness creates by writing session logs to a relative "~".
+# Not project content. Do NOT delete by hand — it holds live session/subagent
+# transcripts, and removing it breaks agent resume.
+/~/
