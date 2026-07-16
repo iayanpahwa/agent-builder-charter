@@ -5,16 +5,16 @@ Text-only (no tools), runs headless via `claude -p`, enforced by its charter.
 
 ## Run it
 ```bash
-cd builder/agents/sentiment-tagger
+cd builders/claude-headless/agents/sentiment-tagger
 ./run.sh manual
 ```
-This runs the agent headless (model + turns + timeout enforced from `charter.yaml`),
+This runs the agent headless (model, turns, and timeout enforced from `charter.yaml`),
 then checks its output against `evals/cases.yaml`. If the invariant passes, the run is
-logged as **complete**; otherwise **failed**. Every run appends to `logs/runs.jsonl`
+logged as complete; otherwise failed. Every run appends to `logs/runs.jsonl`
 (name · timestamp · trigger · outcome · cost · invariants) and saves the full output.
 
 ## What's really enforced (headless)
-`model`, `tools` (none — so it truly can't act), `budget.steps` (`--max-turns`), and the
+`model`, `tools` (none, so it truly can't act), `budget.steps` (`--max-turns`), and the
 wall-clock timeout are hard walls. Change the task by editing `prompts/task.md`, or pass a
-different `--prompt`. To change the rules, re-run the `new-agent` skill — never hand-edit
+different `--prompt`. To change the rules, re-run the `new-agent` skill; never hand-edit
 `charter.yaml`.

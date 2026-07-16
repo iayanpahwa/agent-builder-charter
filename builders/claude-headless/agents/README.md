@@ -1,6 +1,6 @@
 # agents/
 
-Your agents live here — one folder per agent, created by the **new-agent** skill
+Your agents live here, one folder per agent, created by the `new-agent` skill
 (never by hand). This repo ships with one worked example, `sentiment-tagger/`, so you can
 see a finished agent; yours go here alongside it.
 
