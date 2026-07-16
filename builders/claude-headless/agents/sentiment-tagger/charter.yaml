@@ -1,0 +1,55 @@
+# sentiment-tagger — labels a piece of text POSITIVE / NEGATIVE / NEUTRAL.
+# Text-only (no tools), runs headless. The safest possible agent: it can't touch
+# anything, so containment is trivial and the only real question is correctness (evals).
+
+charter: "0.2"
+
+runtime: headless          # runs as a headless `claude -p` command
+
+id: sentiment-tagger
+version: "1"
+
+owner:
+  team: demo
+  on_call: "@owner"
+  escalation: "owner@example.com"
+
+status: enabled
+
+context:
+  trusted_sources:
+    - prompts/system.md
+
+model:
+  provider: anthropic
+  id: claude-haiku-4-5
+
+sandbox:
+  isolation: none          # text-only; touches nothing, so no sandbox needed
+  persist_state: false
+
+budget:
+  steps: 1                 # one turn: read text, emit label
+  wall_clock_seconds: 60
+  tokens: 2000
+
+tools: []                  # no tools at all — the safest posture
+
+credentials: []            # no secrets
+
+egress: [any]              # moot: with no network tool it can't reach anything anyway
+
+approval_tier:
+  auto: []
+  human_approval: []
+
+data:
+  class: public
+  retention_days: 7
+  redact: []
+
+evals:
+  suite: "evals/cases.yaml"
+  success_metric:
+    name: "replies with exactly one allowed label"
+    slo: "100%"

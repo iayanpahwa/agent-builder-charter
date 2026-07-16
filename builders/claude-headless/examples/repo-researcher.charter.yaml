@@ -1,0 +1,56 @@
+# A CHARTER agent meant to run HEADLESS (`claude -p`). Its `tools` are Claude Code tool
+# names (WebFetch etc.) — headless uses the same names. It reads/searches code + fetches
+# docs, cannot run Bash or write files, and may only fetch from two doc domains (egress hook).
+
+charter: "0.2"
+
+runtime: headless         # runs as a headless `claude -p` command
+
+id: repo-researcher
+version: "1"
+
+owner:
+  team: platform
+  on_call: "@platform-oncall"
+  escalation: "platform-lead@..."
+
+status: enabled
+
+context:
+  trusted_sources:
+    - prompts/repo-researcher.system.md
+
+model:
+  provider: anthropic
+  id: claude-haiku-4-5
+
+sandbox:
+  isolation: container      # nominal; a real fs/net sandbox needs a container even headless
+  persist_state: false
+
+budget:
+  steps: 20
+  wall_clock_seconds: 120
+
+tools: [Read, Grep, Glob, WebFetch]   # no Bash, no Write/Edit
+
+credentials: []                        # a read-only researcher needs no secrets
+
+egress:
+  - docs.python.org
+  - raw.githubusercontent.com
+
+approval_tier:
+  auto: [Read, Grep, Glob, WebFetch]
+  human_approval: []
+
+data:
+  class: internal
+  retention_days: 7
+  redact: [token]
+
+evals:
+  suite: "evals/repo-researcher/cases.yaml"
+  success_metric:
+    name: "answers cite a real file or doc section"
+    slo: "90%"

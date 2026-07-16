@@ -1,0 +1,10 @@
+success_metric: "replies with exactly one allowed label"
+slo: "100%"
+
+cases:
+  - id: clear-positive
+    input: "I absolutely love this product — best purchase I've made all year!"
+    invariants:
+      - matches: "^(POSITIVE|NEGATIVE|NEUTRAL)\\s*$"   # exactly one allowed label, nothing else
+    rubric: "The label matches the sentiment of the input"
+    human_check: "none — the invariant is deterministic"
