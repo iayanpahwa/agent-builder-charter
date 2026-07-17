@@ -1,0 +1,2 @@
+# Dev-only dependency for running the test suite (tests/).
+pytest>=8

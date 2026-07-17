@@ -93,14 +93,27 @@ context:
 model:
   provider: anthropic
   id: claude-haiku-4-5
+sandbox:
+  isolation: none
+  persist_state: false
 budget:
   steps: 1
   wall_clock_seconds: 60
 tools: [] # no tools at all, the safest posture
 credentials: []
 egress: [any] # moot: with no network tool it can't reach anything
+approval_tier:
+  auto: []
+  human_approval: []
+data:
+  class: public
+  retention_days: 7
+  redact: []
 evals:
   suite: "evals/cases.yaml"
+  success_metric:
+    name: "replies with exactly one allowed label"
+    slo: "100%"
 ```
 
 ## Quickstart: build and run an agent

@@ -17,8 +17,8 @@ questions that could not be settled on paper:
   budget  -> hard per-run ceilings. The run is killed the moment one is hit.
 
 Everything else in the charter is loaded and carried, but not yet enforced here.
-Full JSON-Schema validation is a separate CI job; this loader does the minimum
-bar needed to refuse an obviously ungoverned agent (fail closed).
+The charter's full JSON Schema is enforced here too (fail closed): a charter that
+violates the schema is refused before it can run.
 
 Run:  python3 loader.py
 """
@@ -27,17 +27,24 @@ import copy
 import os
 
 import yaml
+from jsonschema import Draft202012Validator
+from jsonschema.exceptions import best_match
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CHARTER_PATH = os.path.join(HERE, "examples", "price-watch-scraper.charter.yaml")
+SCHEMA_PATH = os.path.join(HERE, "charter.schema.yaml")
 
 SCHEMA_VERSION = "0.2"
-REQUIRED = [
-    "charter", "id", "version", "owner", "status", "context", "model",
-    "sandbox", "budget", "tools", "credentials", "egress",
-    "approval_tier", "data", "evals",
-]
-STATUS_VALUES = {"enabled", "paused", "killed"}
+
+# Build the schema validator once. If the schema file can't be loaded, remember
+# why and fail closed on every charter (in validate) instead of letting any through.
+_VALIDATOR = None
+_SCHEMA_ERROR = None
+try:
+    with open(SCHEMA_PATH) as _f:
+        _VALIDATOR = Draft202012Validator(yaml.safe_load(_f))
+except Exception as _e:  # noqa: BLE001 - any schema load failure must fail closed
+    _SCHEMA_ERROR = _e
 
 
 # --- fail-closed loader ---------------------------------------------------
@@ -47,19 +54,16 @@ class CharterInvalid(Exception):
 
 def validate(doc):
     """The minimum bar. A charter that fails this does not run."""
+    if _VALIDATOR is None:
+        raise CharterInvalid(f"charter schema unavailable: {_SCHEMA_ERROR}")
     if not isinstance(doc, dict):
         raise CharterInvalid("charter is not a mapping")
     if doc.get("charter") != SCHEMA_VERSION:
         raise CharterInvalid(f"charter schema version must be {SCHEMA_VERSION!r}")
-    missing = [k for k in REQUIRED if k not in doc]
-    if missing:
-        raise CharterInvalid(f"missing required fields: {missing}")
-    if doc["status"] not in STATUS_VALUES:
-        raise CharterInvalid(f"status must be one of {sorted(STATUS_VALUES)}")
-    if not isinstance(doc["tools"], list):
-        raise CharterInvalid("tools must be a list (may be empty for a text-only agent)")
-    if not isinstance(doc["budget"], dict) or not doc["budget"]:
-        raise CharterInvalid("budget must set at least one ceiling")
+    error = best_match(_VALIDATOR.iter_errors(doc))
+    if error is not None:
+        raise CharterInvalid(f"{error.json_path}: {error.message}")
+    # egress semantics not expressible in vanilla JSON Schema:
     egress = doc["egress"]
     if not isinstance(egress, list) or not egress:
         raise CharterInvalid("egress must be a non-empty list (use [any] to mean open on purpose)")
