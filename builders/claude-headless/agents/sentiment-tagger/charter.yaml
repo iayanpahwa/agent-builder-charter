@@ -37,7 +37,7 @@ tools: []                  # no tools at all — the safest posture
 
 credentials: []            # no secrets
 
-egress: [any]              # moot: with no network tool it can't reach anything anyway
+egress: [none]             # no network at all
 
 approval_tier:
   auto: []

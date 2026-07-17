@@ -65,7 +65,8 @@ def test_schema_violation_raises(good_charter, mutate, expected_substring):
     [
         pytest.param(["*.example.com", "any"], "any", id="mixed_any_and_domain"),
         pytest.param(["*"], "*", id="bare_star"),
-        pytest.param([], None, id="empty_list"),
+        pytest.param([], "must not be empty", id="empty_list"),
+        pytest.param(["none", "api.example.com"], "none", id="mixed_none_and_domain"),
     ],
 )
 def test_egress_invalid(good_charter, egress, expected_substring):
@@ -81,6 +82,7 @@ def test_egress_invalid(good_charter, egress, expected_substring):
     [
         pytest.param(["any"], id="any_only"),
         pytest.param(["*.example.com"], id="domain_only"),
+        pytest.param(["none"], id="none_only"),
     ],
 )
 def test_egress_valid(good_charter, egress):

@@ -167,10 +167,14 @@ def report(charter):
                 if budget.get("steps") else ("—", "budget.steps", "not set"))
     rows.append(("WALL", "budget.wall_clock", "subprocess timeout hard-kills the run")
                 if budget.get("wall_clock_seconds") else ("—", "budget.wall_clock", "not set (default 120s)"))
-    if net and egress and "any" not in egress:
+    if egress == ["none"]:
+        rows.append(("WALL", "egress", "[none]: no network permitted — all WebFetch/WebSearch denied"))
+    elif net and egress and "any" not in egress:
         rows.append(("WALL", "egress", "--settings hook denies off-list WebFetch (process-scoped, clean)"))
+    elif "any" in egress:
+        rows.append(("NOT-ENFORCED", "egress", "open ([any]) — nothing to gate"))
     else:
-        rows.append(("NOT-ENFORCED", "egress", "open ([any]) or no network tool — nothing to gate"))
+        rows.append(("NOT-ENFORCED", "egress", "no network tool — nothing to gate"))
     if charter.get("mcp"):
         names = ", ".join(s.get("name", "?") for s in charter["mcp"])
         rows.append(("WALL", "mcp", f"only [{names}] loaded (--strict-mcp-config); each runs its OWN code/secrets — you're trusting it"))

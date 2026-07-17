@@ -101,7 +101,7 @@ budget:
   wall_clock_seconds: 60
 tools: [] # no tools at all, the safest posture
 credentials: []
-egress: [any] # moot: with no network tool it can't reach anything
+egress: [none] # no network at all, the honest choice for a text-only agent
 approval_tier:
   auto: []
   human_approval: []

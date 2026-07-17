@@ -62,7 +62,7 @@ shared, reused by every builder (one level up):
 - `tools: []` is valid: a text-only agent is the safest kind.
 - Honest limits: `--max-budget-usd` may be a no-op under subscription auth; a real fs/net sandbox
   and true credential isolation need a container.
-- `runtime` field; `egress: [any]` sentinel (empty egress invalid); `extensions.human_verification`.
+- `runtime` field; `egress: [any]` / `[none]` sentinels (empty egress invalid); `extensions.human_verification`.
 - Evals are optional and cheap: deterministic invariants gate the run; no pytest, no judge model.
 - Plug-ins: an agent can declare `mcp` servers / custom tools and `skills`, loaded *strict*
   (only yours) with their capabilities added to the allow-list and surfaced in the report; extra

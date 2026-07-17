@@ -77,6 +77,8 @@ def main():
     egress = charter.get("egress", []) or []
     if "any" in egress:
         decision(True, f"cc_guard: egress is open ([any]); '{tool}' allowed by charter '{charter['id']}'")
+    if "none" in egress:
+        decision(False, f"cc_guard: egress is [none] (no network); '{tool}' denied by charter '{charter['id']}'")
 
     key = NET_TOOLS[tool]
     url = tool_input.get(key) if key else None

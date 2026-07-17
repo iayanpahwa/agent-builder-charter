@@ -1,0 +1,86 @@
+"""Tests for cc_guard.py's runtime egress decisions and run_headless.py's dry-run report.
+
+cc_guard only inspects the URL string in the tool event — it never fetches anything, so
+these tests run via subprocess with no tokens and no real network calls.
+"""
+
+import copy
+import json
+import os
+import subprocess
+import sys
+
+import yaml
+import pytest
+
+from conftest import REPO_ROOT
+
+CC_GUARD = REPO_ROOT / "builders" / "claude-headless" / "cc_guard.py"
+RUN_HEADLESS = REPO_ROOT / "builders" / "claude-headless" / "run_headless.py"
+
+
+def _write_charter(tmp_path, good_charter, *, tools, egress):
+    charter = copy.deepcopy(good_charter)
+    charter["tools"] = tools
+    charter["egress"] = egress
+    charter_file = tmp_path / "charter.yaml"
+    charter_file.write_text(yaml.safe_dump(charter))
+    return charter_file
+
+
+def _run_guard(charter_path, event):
+    env = dict(os.environ, _ZO_DOCTOR="0")
+    result = subprocess.run(
+        [sys.executable, str(CC_GUARD), "--charter", str(charter_path)],
+        cwd=str(REPO_ROOT),
+        env=env,
+        input=json.dumps(event),
+        capture_output=True,
+        text=True,
+    )
+    decision = json.loads(result.stdout)
+    return decision["hookSpecificOutput"]["permissionDecision"]
+
+
+# --- 1. cc_guard egress decisions -------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "egress,url,expected",
+    [
+        pytest.param(["none"], "https://docs.python.org/3/", "deny", id="none_denies_any_url"),
+        pytest.param(["any"], "https://docs.python.org/3/", "allow", id="any_allows"),
+        pytest.param(["docs.python.org"], "https://docs.python.org/3/", "allow", id="on_list_allowed"),
+        pytest.param(["docs.python.org"], "https://evil.example.com/", "deny", id="off_list_denied"),
+    ],
+)
+def test_webfetch_egress_decision(tmp_path, good_charter, egress, url, expected):
+    charter_path = _write_charter(tmp_path, good_charter, tools=["WebFetch"], egress=egress)
+    event = {"tool_name": "WebFetch", "tool_input": {"url": url}}
+    assert _run_guard(charter_path, event) == expected
+
+
+def test_non_network_tool_always_allowed(tmp_path, good_charter):
+    # egress [none] would deny any network tool, but a non-network tool is never gated.
+    charter_path = _write_charter(tmp_path, good_charter, tools=["WebFetch"], egress=["none"])
+    event = {"tool_name": "Read", "tool_input": {}}
+    assert _run_guard(charter_path, event) == "allow"
+
+
+# --- 2. run_headless.py --dry-run report -----------------------------------
+
+
+def test_dry_run_reports_none_wall_and_settings_hook(tmp_path, good_charter):
+    charter_path = _write_charter(tmp_path, good_charter, tools=["WebFetch"], egress=["none"])
+    env = dict(os.environ, _ZO_DOCTOR="0")
+    result = subprocess.run(
+        [sys.executable, str(RUN_HEADLESS), "--charter", str(charter_path), "--dry-run", "--prompt", "x"],
+        cwd=str(REPO_ROOT),
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    egress_line = next(line for line in result.stdout.splitlines() if "egress" in line)
+    assert "WALL" in egress_line
+    assert "no network permitted" in egress_line
+    assert "--settings" in result.stdout

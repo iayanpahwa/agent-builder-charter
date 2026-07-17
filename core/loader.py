@@ -60,17 +60,21 @@ def validate(doc):
         raise CharterInvalid("charter is not a mapping")
     if doc.get("charter") != SCHEMA_VERSION:
         raise CharterInvalid(f"charter schema version must be {SCHEMA_VERSION!r}")
+    # egress semantics not expressible in vanilla JSON Schema — checked BEFORE the
+    # schema pass so an egress-specific friendly message wins over jsonschema's cryptic one.
+    if "egress" in doc and isinstance(doc["egress"], list):
+        egress = doc["egress"]
+        if not egress:
+            raise CharterInvalid("egress must not be empty — give a domain list, or [any] (open) or [none] (no network)")
+        if "*" in egress:
+            raise CharterInvalid("egress may not contain a bare '*'; use 'any' to mean open, or list domains/patterns")
+        if "any" in egress and len(egress) != 1:
+            raise CharterInvalid("egress 'any' must be the only entry (a mixed list looks scoped but is open)")
+        if "none" in egress and len(egress) != 1:
+            raise CharterInvalid("egress 'none' must be the only entry (you can't declare no network and also allow domains)")
     error = best_match(_VALIDATOR.iter_errors(doc))
     if error is not None:
         raise CharterInvalid(f"{error.json_path}: {error.message}")
-    # egress semantics not expressible in vanilla JSON Schema:
-    egress = doc["egress"]
-    if not isinstance(egress, list) or not egress:
-        raise CharterInvalid("egress must be a non-empty list (use [any] to mean open on purpose)")
-    if "*" in egress:
-        raise CharterInvalid("egress may not contain a bare '*'; use 'any' to mean open, or list domains/patterns")
-    if "any" in egress and len(egress) != 1:
-        raise CharterInvalid("egress 'any' must be the only entry (a mixed list looks scoped but is open)")
 
 
 def load_charter(path):

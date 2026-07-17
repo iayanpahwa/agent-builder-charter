@@ -198,12 +198,15 @@ properties:
       not be empty — a blank list is ambiguous (open on purpose, or just forgotten?).
       To say "open on purpose", use `any` as the single, sole entry (`egress: [any]`);
       then containment must come from elsewhere (read-only tools, no credentials), and
-      the builder's report will say egress is not-enforced. A bare `*` entry is not
+      the builder's report will say egress is not-enforced. To declare NO network use,
+      use `none` as the sole entry (`egress: [none]`); the runtime blocks every network
+      call, and like `any`, `none` must be the only entry. A bare `*` entry is not
       allowed (use `any`); subdomain patterns like `*.example.com` are fine.
     x-enforced: R
     x-runtime: >
-      The network layer refuses any connection not on this list — unless the list is
-      exactly [any]. Your main guard against data being sent somewhere it should not.
+      The network layer refuses any connection not on this list — allowing all when the
+      list is exactly [any] (open), and refusing every connection when it is exactly
+      [none] (all denied). Your main guard against data being sent somewhere it should not.
 
   # --- Plug-ins: extra capabilities, each declared so it goes through the door ---
   mcp:
