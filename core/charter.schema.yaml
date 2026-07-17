@@ -197,9 +197,11 @@ properties:
         scope: {type: string, description: "The narrow role, e.g. read-only on table X."}
     x-enforced: block
     x-runtime: >
-      Intent: hand the agent only these secrets, at only this scope, and nothing else. Headless
-      has NO credential isolation — the agent inherits the host environment; a container is required
-      for real scoping. See the builder report.
+      Intent: hand the agent only these secrets, at only this scope, and nothing else.
+      The headless builder scopes the subprocess environment to Claude Code's own auth
+      plus the credentials declared as `env:VARNAME`, dropping every other host secret;
+      it does NOT isolate the filesystem, so file-stored secrets stay readable and a
+      container is still required for full scoping. See the builder report.
 
   egress:
     type: array

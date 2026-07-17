@@ -42,7 +42,9 @@ Ask in plain language; group questions; honor the safety rule.
    `approval_tier.human_approval`. Note: unattended headless can't prompt a human, so
    destructive tools are enforced by being **left out**, not gated — say so.
 4. **"Any secret / API key? Least access that works?"** → `credentials[]` (`ref` = vault
-   pointer, never the value). Default none.
+   pointer, never the value). Default none. In the headless builder a `ref: env:VARNAME` is
+   passed through from the host environment into the run; a `ref: vault://...` is declared but
+   not resolved by this builder (it needs a resolver).
 5. **"What does it talk to online?"** → `egress` (safety — confirm). A specific domain list (a
    wall), `[any]` (explicit open — risky; not a wall), or `[none]` (no network at all — the
    safest, right for text-only agents). Never empty.

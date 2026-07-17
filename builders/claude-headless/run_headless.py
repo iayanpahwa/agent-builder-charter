@@ -16,7 +16,7 @@ Real walls in headless (this is why headless beats the interactive-subagent path
   status                     -> refuses to run unless 'enabled'
 Honest limits (flags can't; a container can):
   budget.usd  -> --max-budget-usd, but MAY be a no-op under subscription auth (verify).
-  credentials -> only declared creds injected; TRUE isolation needs a clean/container env.
+  credentials -> host env scoped to Claude auth + declared env: refs; all other secrets dropped; fs NOT isolated (needs container).
   sandbox     -> a real fs/net jail needs a container.
 
 Flags follow the current docs — VERIFY periodically, they drift:
@@ -174,7 +174,8 @@ def report(charter):
     if budget.get("usd"):
         rows.append(("declared", "budget.usd", f"--max-budget-usd {budget['usd']} — MAY be a no-op under subscription auth; verify"))
     rows.append(("block", "tools", "--allowedTools + --disallowedTools (dangerous tools denied)"))
-    rows.append(("declared", "credentials", "the agent inherits the full host environment; true credential isolation needs a container"))
+    rows.append(("block", "credentials.env", "host env scoped to Claude's auth (CLAUDE_*/ANTHROPIC_*) + OS essentials + declared env: refs; all other host secrets dropped"))
+    rows.append(("none", "credentials.fs", "filesystem NOT isolated — file-stored secrets (dotfiles, ~/.aws, the config dir) stay readable; a container is required"))
     if egress == ["none"]:
         rows.append(("block", "egress", "[none]: no network permitted — all WebFetch/WebSearch denied"))
     elif net and egress and "any" not in egress:
@@ -210,6 +211,29 @@ def _cleanup(paths):
             os.remove(p)
         except OSError:
             pass
+
+
+_ESSENTIAL_VARS = ("PATH", "HOME", "USER", "LOGNAME", "SHELL", "TERM", "TMPDIR", "TZ", "LANG")
+_ESSENTIAL_PREFIXES = ("LC_", "ANTHROPIC_", "CLAUDE_")  # locale + Claude Code's own auth/config
+
+
+def scoped_env(charter):
+    """The subprocess environment: Claude's own auth + OS essentials + the charter's
+    declared `env:` credentials — and nothing else. Every other host secret is dropped.
+    This scopes the ENVIRONMENT only; it is NOT filesystem isolation (a container is
+    required for that)."""
+    src = os.environ
+    env = {k: src[k] for k in _ESSENTIAL_VARS if k in src}
+    for k in src:
+        if k.startswith(_ESSENTIAL_PREFIXES):
+            env[k] = src[k]
+    for cred in charter.get("credentials") or []:
+        ref = cred.get("ref", "")
+        if ref.startswith("env:"):
+            var = ref[4:]
+            if var in src:
+                env[var] = src[var]
+    return env
 
 
 # --- the run --------------------------------------------------------------
@@ -267,7 +291,7 @@ def main():
     t0 = time.time()
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout,
-                              env=os.environ.copy())  # claude needs its auth env; container = real isolation
+                              env=scoped_env(charter))  # scoped: Claude's auth + declared env: creds only; fs isolation still needs a container
         elapsed = round(time.time() - t0, 1)
     except subprocess.TimeoutExpired:
         elapsed = round(time.time() - t0, 1)

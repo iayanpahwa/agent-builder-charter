@@ -62,6 +62,9 @@ shared, reused by every builder (one level up):
 - `tools: []` is valid: a text-only agent is the safest kind.
 - Honest limits: `--max-budget-usd` may be a no-op under subscription auth; a real fs/net sandbox
   and true credential isolation need a container.
+- Credentials: the runner scopes the subprocess env to Claude's auth + OS essentials + the
+  charter's declared `env:` refs; all other host secrets are dropped. Filesystem isolation
+  (file-stored secrets) still needs a container.
 - `runtime` field; `egress: [any]` / `[none]` sentinels (empty egress invalid); `extensions.human_verification`.
 - Evals are optional and cheap: deterministic invariants gate the run; no pytest, no judge model.
 - Plug-ins: an agent can declare `mcp` servers / custom tools and `skills`, loaded *strict*

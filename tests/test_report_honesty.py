@@ -64,11 +64,19 @@ def test_totality_fully_populated_charter(good_charter):
 # --- 2. Credentials truthfulness ---------------------------------------------
 
 
-def test_credentials_row_is_honest(good_charter):
+def test_credentials_rows_are_honest(good_charter):
     rows = report(good_charter)
-    note = next(note for _, field, note in rows if field == "credentials")
-    assert "full host environment" in note
-    assert "only declared creds injected" not in note
+
+    env_row = next(r for r in rows if r[1] == "credentials.env")
+    assert env_row[0] == "block"
+    assert "dropped" in env_row[2]
+
+    fs_row = next(r for r in rows if r[1] == "credentials.fs")
+    assert fs_row[0] == "none"
+    assert "filesystem" in fs_row[2]
+    assert "container" in fs_row[2]
+
+    assert not any("full host environment" in note for _, _, note in rows)
 
 
 # --- 3. budget.tokens ---------------------------------------------------------
