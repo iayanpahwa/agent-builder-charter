@@ -9,6 +9,9 @@
 #   CI  checked before release; a failure blocks the deploy
 #   P   must be present and filled in; the registry rejects a blank one
 #   AL  wired to an alarm; the owner gets paged if it is breached
+# The tag is the INTENT — the strongest enforcement class the field aims for. What a
+# given runtime ACTUALLY enforces depends on that runtime; the builder's `--dry-run`
+# report is the authoritative, honest per-runtime truth (the tag is the goal, the report is real).
 #
 # This file is JSON Schema written in YAML, so it can validate real charters.
 
@@ -105,9 +108,10 @@ properties:
         description: The complete list of files the agent's prompt and rules are assembled from. If it is not here, it is not trusted.
     x-enforced: R
     x-runtime: >
-      The runtime tags everything the model reads as trusted or untrusted. Only
-      these files are trusted. Fetched pages and memory are always tagged untrusted,
-      cleaned, and marked with where they came from before they can be read again.
+      Intent: the runtime tags everything the model reads as trusted or untrusted, so
+      only these files count as instructions and fetched pages/memory are cleaned and
+      marked with where they came from. NOT implemented in the headless builder — there
+      trusted_sources are simply concatenated into the system prompt. See the builder report.
 
   # --- Harness: the bounded box it runs in ---------------------------------
   model:
@@ -145,7 +149,9 @@ properties:
         type: boolean
         description: Whether anything survives after the run ends. Default false.
     x-enforced: R
-    x-runtime: Starts the agent inside this box. It cannot reach outside it.
+    x-runtime: >
+      Intent: start the agent inside this box so it cannot reach outside it. A headless run
+      has no real sandbox — a true fs/net jail needs a container, which flags can't give. See the builder report.
 
   budget:
     type: object
@@ -187,7 +193,10 @@ properties:
         ref:   {type: string, description: Pointer to the secret in your vault, not the value.}
         scope: {type: string, description: "The narrow role, e.g. read-only on table X."}
     x-enforced: R
-    x-runtime: Hands the agent only these secrets, at only this scope. It never sees anything else.
+    x-runtime: >
+      Intent: hand the agent only these secrets, at only this scope, and nothing else. Headless
+      has NO credential isolation — the agent inherits the host environment; a container is required
+      for real scoping. See the builder report.
 
   egress:
     type: array
@@ -255,7 +264,10 @@ properties:
         items: {type: string}
         description: "Action types that must wait for a human OK, e.g. spend money, delete, send email."
     x-enforced: R
-    x-runtime: An action in the human_approval list is held in a queue until a person approves it.
+    x-runtime: >
+      Intent: an action in the human_approval list is held in a queue until a person approves it.
+      Unattended headless has NO approval queue — such actions are contained by being left OUT of
+      tools, not gated at run time. See the builder report.
 
   # --- Telemetry: what is watched and kept ---------------------------------
   data:
@@ -276,7 +288,10 @@ properties:
         items: {type: string}
         description: "Things to hide from logs, e.g. emails, tokens."
     x-enforced: R
-    x-runtime: Logs hide the listed items and are deleted after the retention window. Guards against secrets leaking into logs.
+    x-runtime: >
+      Intent: logs hide the listed items and are deleted after the retention window, guarding
+      against secrets leaking into logs. The headless runner does NOT yet redact logs or
+      auto-delete them; class is recorded but advisory. See the builder report.
 
   # --- Evals: how you know it works ----------------------------------------
   evals:

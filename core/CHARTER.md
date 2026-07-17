@@ -27,6 +27,10 @@ e.g. `../builders/claude-headless/run_headless.py` (the headless runner) and `cc
 - **P** — must be filled in: the registry rejects a blank one (`id`, `version`, `owner`).
 - **none** — declared, not enforced (e.g. `runtime`, `extensions`).
 
+These tags are the **intended** enforcement class — the goal for a field. What a given runtime
+**actually** enforces is reported honestly by that builder's `--dry-run` report; when they differ,
+the report is authoritative (the tag is the goal, the report is real).
+
 A missing, malformed, or schema-invalid charter **fails closed** — the agent doesn't start.
 Better a dead agent than an ungoverned one.
 

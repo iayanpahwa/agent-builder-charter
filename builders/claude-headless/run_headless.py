@@ -155,18 +155,27 @@ def build_command(charter, charter_dir, prompt):
 
 
 def report(charter):
+    """Every enforcement-relevant field gets one honest row — nothing hidden."""
     tools = charter.get("tools", []) or []
     egress = charter.get("egress", []) or []
     budget = charter.get("budget") or {}
     net = bool(NET_TOOLS & set(tools))
     rows = [
+        ("WALL", "status", "run refused unless status is 'enabled'"),
+        ("DECLARED", "context", "trusted_sources concatenated into the system prompt; fetched pages & memory are NOT auto-tagged or cleaned in headless"),
         ("WALL", "model", "--model pins it"),
-        ("WALL", "tools", "--allowedTools + --disallowedTools (dangerous tools denied)"),
+        ("UNAVAILABLE", "sandbox", "a real fs/net jail needs a container; flags can't"),
     ]
     rows.append(("WALL", "budget.steps", "--max-turns hard-stops the run")
                 if budget.get("steps") else ("—", "budget.steps", "not set"))
     rows.append(("WALL", "budget.wall_clock", "subprocess timeout hard-kills the run")
                 if budget.get("wall_clock_seconds") else ("—", "budget.wall_clock", "not set (default 120s)"))
+    if budget.get("tokens"):
+        rows.append(("NOT-ENFORCED", "budget.tokens", "no token-ceiling flag in headless; bounded by steps/wall-clock/usd"))
+    if budget.get("usd"):
+        rows.append(("ADVISORY", "budget.usd", f"--max-budget-usd {budget['usd']} — MAY be a no-op under subscription auth; verify"))
+    rows.append(("WALL", "tools", "--allowedTools + --disallowedTools (dangerous tools denied)"))
+    rows.append(("DECLARED", "credentials", "the agent inherits the full host environment; true credential isolation needs a container"))
     if egress == ["none"]:
         rows.append(("WALL", "egress", "[none]: no network permitted — all WebFetch/WebSearch denied"))
     elif net and egress and "any" not in egress:
@@ -180,12 +189,15 @@ def report(charter):
         rows.append(("WALL", "mcp", f"only [{names}] loaded (--strict-mcp-config); each runs its OWN code/secrets — you're trusting it"))
     if charter.get("skills"):
         rows.append(("WALL", "skills", f"restricted to {charter['skills']} (settings.availableSkills; version-dependent)"))
-    if budget.get("usd"):
-        rows.append(("ADVISORY", "budget.usd", f"--max-budget-usd {budget['usd']} — MAY be a no-op under subscription auth; verify"))
-    rows += [
-        ("DECLARED", "credentials", "only declared creds injected; TRUE isolation needs a clean/container env"),
-        ("UNAVAILABLE", "sandbox", "a real fs/net jail needs a container; flags can't"),
-    ]
+    if charter.get("approval_tier", {}).get("human_approval"):
+        rows.append(("NOT-ENFORCED", "approval_tier", "headless is unattended (bypassPermissions); destructive actions are contained by omission from tools, not an approval queue"))
+    else:
+        rows.append(("DECLARED", "approval_tier", "no human-approval actions declared"))
+    rows.append(("DECLARED", "data.class", "recorded; sensitivity is advisory in headless"))
+    rows.append(("NOT-ENFORCED", "data.redact/retention", "logs are not redacted or auto-deleted in headless"))
+    rows.append(("DECLARED", "evals", "run with --eval to gate on invariants; the suite/SLO are checked outside this runner"))
+    if charter.get("extensions"):
+        rows.append(("DECLARED", "extensions", "ignored by the loader; declared only"))
     return rows
 
 
