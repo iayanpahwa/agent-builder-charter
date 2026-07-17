@@ -102,17 +102,16 @@ def _mcp_config_file(charter):
     return path, allowed
 
 
-def _settings_file(charter, charter_dir):
+def _settings_file(charter, charter_path):
     """One --settings file merging the egress hook and the skills allow-list."""
     settings = {}
     egress = charter.get("egress", []) or []
     tools = charter.get("tools", []) or []
     if (NET_TOOLS & set(tools)) and egress and "any" not in egress:
         guard = os.path.join(HERE, "cc_guard.py")
-        charter_abs = os.path.join(charter_dir, "charter.yaml")
         settings["hooks"] = {"PreToolUse": [
             {"matcher": "WebFetch|WebSearch", "hooks": [
-                {"type": "command", "command": f"python3 {guard} --charter {charter_abs}"}]}]}
+                {"type": "command", "command": f"python3 {guard} --charter {charter_path}"}]}]}
     if charter.get("skills"):
         settings["availableSkills"] = charter["skills"]   # restrict to ONLY these
     if not settings:
@@ -123,7 +122,7 @@ def _settings_file(charter, charter_dir):
     return path
 
 
-def build_command(charter, charter_dir, prompt):
+def build_command(charter, charter_dir, charter_path, prompt):
     tools = list(charter.get("tools", []) or [])
     budget = charter.get("budget") or {}
     cmd = ["claude", "-p", prompt,
@@ -146,7 +145,7 @@ def build_command(charter, charter_dir, prompt):
     sys_file = _system_prompt_file(charter, charter_dir)
     if sys_file:
         cmd += ["--append-system-prompt-file", sys_file]
-    settings_file = _settings_file(charter, charter_dir)
+    settings_file = _settings_file(charter, charter_path)
     if settings_file:
         cmd += ["--settings", settings_file]
     if budget.get("usd"):
@@ -250,7 +249,7 @@ def main():
         print("REFUSED: no task prompt (pass --prompt, or add prompts/task.md)")
         sys.exit(4)
 
-    cmd, tmpfiles = build_command(charter, charter_dir, prompt)
+    cmd, tmpfiles = build_command(charter, charter_dir, charter_path, prompt)
 
     print(f"\n=== headless run: {name} (trigger={args.trigger}) ===")
     print("what this run enforces:")
