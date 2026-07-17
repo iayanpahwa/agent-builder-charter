@@ -218,9 +218,11 @@ properties:
       allowed (use `any`); subdomain patterns like `*.example.com` are fine.
     x-enforced: block
     x-runtime: >
-      The network layer refuses any connection not on this list — allowing all when the
-      list is exactly [any] (open), and refusing every connection when it is exactly
-      [none] (all denied). Your main guard against data being sent somewhere it should not.
+      The egress hook gates the web tools (WebFetch, WebSearch): WebFetch is allowed only to
+      hosts on the list, WebSearch is denied under a scoped list (a search can't be confined to
+      hosts) and allowed only under [any], and [none] denies both. It does NOT fence Bash or MCP
+      servers — those reach the network outside egress, so a container is required to contain them.
+      Your main guard against web tools sending data somewhere they should not; see the builder report.
 
   # --- Plug-ins: extra capabilities, each declared so it goes through the door ---
   mcp:

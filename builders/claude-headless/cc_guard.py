@@ -83,7 +83,10 @@ def main():
     key = NET_TOOLS[tool]
     url = tool_input.get(key) if key else None
     if not url:
-        decision(True, f"cc_guard: '{tool}' has no URL to check (WebSearch); allowed — egress covers WebFetch only")
+        # Reached only with a scoped egress list ([any]/[none] handled above). A tool with no
+        # checkable URL (WebSearch) can't be confined to an allow-list — deny it. Use egress:[any]
+        # to permit open search, or drop WebSearch from tools.
+        decision(False, f"cc_guard: '{tool}' has no host to check against egress {egress}; a scoped allow-list can't confine it — use egress:[any] to permit it or drop {tool}")
 
     host = urlparse(url).hostname or ""
     if host_allowed(host, egress):

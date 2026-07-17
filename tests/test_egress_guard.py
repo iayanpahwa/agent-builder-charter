@@ -67,6 +67,21 @@ def test_non_network_tool_always_allowed(tmp_path, good_charter):
     assert _run_guard(charter_path, event) == "allow"
 
 
+@pytest.mark.parametrize(
+    "egress,expected",
+    [
+        pytest.param(["docs.python.org"], "deny", id="scoped_denies_websearch"),
+        pytest.param(["any"], "allow", id="any_allows_websearch"),
+        pytest.param(["none"], "deny", id="none_denies_websearch"),
+    ],
+)
+def test_websearch_egress_decision(tmp_path, good_charter, egress, expected):
+    # WebSearch's tool_input has "query", not "url" — it can't be confined to a host list.
+    charter_path = _write_charter(tmp_path, good_charter, tools=["WebSearch"], egress=egress)
+    event = {"tool_name": "WebSearch", "tool_input": {"query": "x"}}
+    assert _run_guard(charter_path, event) == expected
+
+
 # --- 2. run_headless.py --dry-run report -----------------------------------
 
 
@@ -82,5 +97,5 @@ def test_dry_run_reports_none_block_and_settings_hook(tmp_path, good_charter):
     )
     egress_line = next(line for line in result.stdout.splitlines() if "egress" in line)
     assert "block" in egress_line
-    assert "no network permitted" in egress_line
+    assert "denied" in egress_line
     assert "--settings" in result.stdout

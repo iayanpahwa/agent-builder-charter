@@ -182,7 +182,8 @@ def test_egress_none_is_block(good_charter):
     rows = report(charter)
     row = next(r for r in rows if r[1] == "egress")
     assert row[0] == "block"
-    assert "no network permitted" in row[2]
+    assert "denied" in row[2]
+    assert "no network" in row[2].lower()
 
 
 def test_egress_domain_list_with_webfetch_is_wall(good_charter):
@@ -197,3 +198,40 @@ def test_egress_any_is_none(good_charter):
     rows = report(charter)
     row = next(r for r in rows if r[1] == "egress")
     assert row[0] == "none"
+
+
+def test_egress_scoped_list_notes_websearch_denied(good_charter):
+    charter = _charter(good_charter, tools=["WebFetch"], egress=["docs.python.org"])
+    rows = report(charter)
+    row = next(r for r in rows if r[1] == "egress")
+    assert row[0] == "block"
+    assert "WebSearch denied" in row[2]
+
+
+# --- 9. egress.other — Bash/MCP escape network egress entirely ------------------
+
+
+def test_egress_other_row_present_with_bash(good_charter):
+    charter = _charter(good_charter, tools=["Bash"], egress=["none"])
+    rows = report(charter)
+    row = next(r for r in rows if r[1] == "egress.other")
+    assert row[0] == "none"
+    assert "container" in row[2]
+    assert "Bash" in row[2]
+
+
+def test_egress_other_row_absent_without_bash_or_mcp(good_charter):
+    charter = _charter(good_charter, tools=["WebFetch"], egress=["docs.python.org"])
+    rows = report(charter)
+    assert not any(r[1] == "egress.other" for r in rows)
+
+
+def test_egress_other_row_present_with_mcp(good_charter):
+    charter = _charter(
+        good_charter,
+        mcp=[{"name": "x", "server": {"type": "stdio", "command": "c", "args": []}, "allow": ["*"]}],
+    )
+    rows = report(charter)
+    row = next(r for r in rows if r[1] == "egress.other")
+    assert row[0] == "none"
+    assert "MCP" in row[2]

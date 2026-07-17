@@ -245,13 +245,18 @@ def report(charter):
     rows.append(("block", "credentials.env", "host env scoped to Claude's auth (CLAUDE_*/ANTHROPIC_*) + OS essentials + declared env: refs; all other host secrets dropped"))
     rows.append(("none", "credentials.fs", "filesystem NOT isolated — file-stored secrets (dotfiles, ~/.aws, the config dir) stay readable; a container is required"))
     if egress == ["none"]:
-        rows.append(("block", "egress", "[none]: no network permitted — all WebFetch/WebSearch denied"))
+        rows.append(("block", "egress", "WebFetch/WebSearch denied (no network via web tools)"))
     elif net and egress and "any" not in egress:
-        rows.append(("block", "egress", "--settings hook denies off-list WebFetch (process-scoped, clean)"))
+        rows.append(("block", "egress", "WebFetch gated to the allow-list; WebSearch denied (a search can't be confined to hosts)"))
     elif "any" in egress:
         rows.append(("none", "egress", "open ([any]) — nothing to gate"))
     else:
-        rows.append(("none", "egress", "no network tool — nothing to gate"))
+        rows.append(("none", "egress", "no WebFetch/WebSearch tool — nothing to gate"))
+    _escapes = [t for t in tools if t == "Bash"]
+    if charter.get("mcp"):
+        _escapes.append("MCP servers")
+    if _escapes:
+        rows.append(("none", "egress.other", f"{', '.join(_escapes)} reach the network OUTSIDE egress — the hook gates only WebFetch/WebSearch; a container is required to fence these"))
     if charter.get("mcp"):
         names = ", ".join(s.get("name", "?") for s in charter["mcp"])
         rows.append(("block", "mcp", f"only [{names}] loaded (--strict-mcp-config); each runs its OWN code/secrets — you're trusting it"))
