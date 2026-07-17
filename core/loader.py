@@ -25,6 +25,7 @@ Run:  python3 loader.py
 
 import copy
 import os
+import re
 
 import yaml
 from jsonschema import Draft202012Validator
@@ -35,6 +36,8 @@ CHARTER_PATH = os.path.join(HERE, "examples", "price-watch-scraper.charter.yaml"
 SCHEMA_PATH = os.path.join(HERE, "charter.schema.yaml")
 
 SCHEMA_VERSION = "0.2"
+
+_EGRESS_HOST_RE = re.compile(r"^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*$")  # a domain label chain; '*.' prefix stripped before match
 
 # Build the schema validator once. If the schema file can't be loaded, remember
 # why and fail closed on every charter (in validate) instead of letting any through.
@@ -72,6 +75,15 @@ def validate(doc):
             raise CharterInvalid("egress 'any' must be the only entry (a mixed list looks scoped but is open)")
         if "none" in egress and len(egress) != 1:
             raise CharterInvalid("egress 'none' must be the only entry (you can't declare no network and also allow domains)")
+        for e in egress:
+            if e in ("any", "none"):
+                continue
+            host = e[2:] if e.startswith("*.") else e
+            if not _EGRESS_HOST_RE.match(host):
+                raise CharterInvalid(
+                    f"egress entry {e!r} must be a domain like 'docs.python.org' "
+                    f"or a wildcard like '*.example.com'"
+                )
     error = best_match(_VALIDATOR.iter_errors(doc))
     if error is not None:
         raise CharterInvalid(f"{error.json_path}: {error.message}")

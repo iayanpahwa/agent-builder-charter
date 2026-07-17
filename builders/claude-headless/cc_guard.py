@@ -44,7 +44,9 @@ def decision(allow, reason):
 
 def host_allowed(host, egress):
     for pattern in egress:
-        bare = pattern.lstrip("*.")           # a plain entry matches the host and its subdomains
+        bare = pattern[2:] if pattern.startswith("*.") else pattern
+        if not bare:
+            continue
         if host == pattern or host == bare or host.endswith("." + bare):
             return True
     return False

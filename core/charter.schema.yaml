@@ -178,7 +178,9 @@ properties:
   # --- Authority: what it is allowed to touch ------------------------------
   tools:
     type: array
-    items: {type: string}
+    items:
+      type: string
+      pattern: "^[A-Za-z0-9_.*-]+$"   # one tool token — no commas/spaces (mcp tools are mcp__server__tool)
     description: The exact list of tools the agent may call. Nothing else is callable.
     x-enforced: block
     x-runtime: Any tool call not on this list is refused before it runs.
@@ -239,7 +241,7 @@ properties:
       additionalProperties: false
       required: [name, server]
       properties:
-        name:   {type: string, description: "Server name; its tools are mcp__<name>__<tool>."}
+        name:   {type: string, pattern: "^[A-Za-z0-9_.-]+$", description: "Server name; its tools are mcp__<name>__<tool>."}
         server: {type: object, description: "The mcpServers entry (type/command/args/url/env/headers). Put secrets as ${ENV_VAR} and declare them in credentials."}
         allow:
           type: array
