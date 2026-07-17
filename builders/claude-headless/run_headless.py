@@ -14,6 +14,7 @@ Real walls in headless (this is why headless beats the interactive-subagent path
   egress (specific list)     -> --settings PreToolUse hook (cc_guard); process-scoped, clean
   context.trusted_sources    -> --append-system-prompt-file (concatenated)
   status                     -> refuses to run unless 'enabled'
+  data.redact/retention      -> declared patterns + env: cred values scrubbed from logs; old logs pruned past retention_days.
 Honest limits (flags can't; a container can):
   budget.usd  -> --max-budget-usd, but MAY be a no-op under subscription auth (verify).
   credentials -> host env scoped to Claude auth + declared env: refs; all other secrets dropped; fs NOT isolated (needs container).
@@ -30,6 +31,7 @@ Usage:
 import argparse
 import json
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -64,6 +66,72 @@ def save_output(charter_dir, text):
     with open(p, "w") as f:
         f.write(text)
     return p
+
+
+def _declared_secret_values(charter):
+    """Values of the charter's declared env: credentials that are set in the host
+    environment — so an echoed secret never lands in a log."""
+    vals = []
+    for cred in charter.get("credentials") or []:
+        ref = cred.get("ref", "")
+        if ref.startswith("env:"):
+            var = ref[4:]
+            if var in os.environ:
+                vals.append(os.environ[var])
+    return vals
+
+
+def _redact(text, patterns, secret_values):
+    """Scrub declared patterns and declared secret values from text before it is
+    persisted. Each pattern is a regex (falls back to a literal if it will not
+    compile). Redaction is only as complete as the patterns you declare."""
+    if not text:
+        return text
+    for pat in patterns or []:
+        try:
+            text = re.compile(pat).sub("[REDACTED]", text)
+        except re.error:
+            text = text.replace(pat, "[REDACTED]")
+    for val in secret_values or []:
+        if val and len(val) >= 4:
+            text = text.replace(val, "[REDACTED]")
+    return text
+
+
+def prune_logs(charter_dir, retention_days):
+    """Delete output files and runs.jsonl entries older than the retention window.
+    Housekeeping runs when the agent runs — this is not a daemon."""
+    if not retention_days:
+        return
+    d = _logdir(charter_dir)
+    cutoff = time.time() - retention_days * 86400
+    for fname in os.listdir(d):
+        if fname.endswith(".output.txt"):
+            p = os.path.join(d, fname)
+            try:
+                if os.path.getmtime(p) < cutoff:
+                    os.remove(p)
+            except OSError:
+                pass
+    runs = os.path.join(d, "runs.jsonl")
+    if os.path.exists(runs):
+        kept = []
+        with open(runs) as f:
+            for line in f:
+                line = line.rstrip("\n")
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                    ts = entry.get("timestamp")
+                    if ts and datetime.fromisoformat(ts).timestamp() < cutoff:
+                        continue  # too old — drop
+                except Exception:  # noqa: BLE001
+                    pass  # keep unparseable lines rather than lose data
+                kept.append(line)
+        with open(runs, "w") as f:
+            if kept:
+                f.write("\n".join(kept) + "\n")
 
 
 # --- building the enforced command ---------------------------------------
@@ -194,7 +262,17 @@ def report(charter):
     else:
         rows.append(("declared", "approval_tier", "no human-approval actions declared"))
     rows.append(("declared", "data.class", "recorded; sensitivity is advisory in headless"))
-    rows.append(("none", "data.redact/retention", "logs are not redacted or auto-deleted in headless"))
+    _data = charter.get("data") or {}
+    _has_env_creds = any((c.get("ref", "") or "").startswith("env:") for c in (charter.get("credentials") or []))
+    if _data.get("redact") or _has_env_creds:
+        _what = "declared patterns + env: credential values" if _data.get("redact") else "declared env: credential values"
+        rows.append(("block", "data.redact", f"{_what} scrubbed from saved output, console, and eval detail before write (only as complete as your patterns)"))
+    else:
+        rows.append(("declared", "data.redact", "nothing to redact — no patterns and no env: credentials declared"))
+    if _data.get("retention_days"):
+        rows.append(("block", "data.retention", f"output files & runs.jsonl entries older than {_data['retention_days']}d pruned when the agent runs (housekeeping, not a daemon)"))
+    else:
+        rows.append(("declared", "data.retention", "no retention window; logs kept indefinitely"))
     rows.append(("declared", "evals", "run with --eval to gate on invariants; the suite/SLO are checked outside this runner"))
     if charter.get("extensions"):
         rows.append(("declared", "extensions", "ignored by the loader; declared only"))
@@ -314,8 +392,6 @@ def main():
     except Exception:  # noqa: BLE001
         result = (proc.stdout or "").strip()
 
-    out_path = save_output(charter_dir, result)
-
     invariants, outcome = [], "ran"
     if args.eval:
         cases_path = os.path.join(charter_dir, "evals", "cases.yaml")
@@ -329,13 +405,27 @@ def main():
                     allpass = allpass and ok
             outcome = "complete" if (allpass and cases) else ("failed" if cases else "ran")
 
+    # redact declared patterns + declared secret values from everything we persist;
+    # evals above ran on the raw result so redaction can't break a passing invariant
+    _data = charter.get("data") or {}
+    patterns = _data.get("redact") or []
+    secret_values = _declared_secret_values(charter)
+    safe_result = _redact(result, patterns, secret_values)
+    for inv in invariants:
+        if inv.get("detail"):
+            inv["detail"] = _redact(inv["detail"], patterns, secret_values)
+
+    out_path = save_output(charter_dir, safe_result)
+
     log_run(charter_dir, {"name": name, "timestamp": now(), "trigger": args.trigger,
                           "model": charter["model"]["id"], "duration_s": elapsed,
                           "outcome": outcome, "cost_usd": cost, "invariants": invariants,
-                          "output_chars": len(result), "output_file": os.path.basename(out_path)})
+                          "output_chars": len(safe_result), "output_file": os.path.basename(out_path)})
 
-    print(f"\n--- output ({len(result)} chars, saved to logs/) ---")
-    print(result[:800] + ("…" if len(result) > 800 else ""))
+    prune_logs(charter_dir, _data.get("retention_days"))
+
+    print(f"\n--- output ({len(safe_result)} chars, saved to logs/) ---")
+    print(safe_result[:800] + ("…" if len(safe_result) > 800 else ""))
     print(f"\ncost_usd: {cost}   duration: {elapsed}s")
     if args.eval and invariants:
         for r in invariants:

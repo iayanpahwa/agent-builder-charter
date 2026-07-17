@@ -115,13 +115,40 @@ def test_approval_tier_declared_without_human_approval(good_charter):
 # --- 5. data.redact/retention ---------------------------------------------------
 
 
-def test_data_redact_retention_not_enforced(good_charter):
-    rows = report(good_charter)
-    matches = [r for r in rows if r[1].startswith("data") and r[0] == "none"]
-    assert len(matches) == 1
-    note = matches[0][2].lower()
-    assert "redact" in note
-    assert "auto-deleted" in note
+def test_data_redact_and_retention_rows(good_charter):
+    # redact patterns present -> data.redact is "block"
+    charter = _charter(good_charter, data={"class": "pii", "redact": ["token"]})
+    rows = report(charter)
+    row = next(r for r in rows if r[1] == "data.redact")
+    assert row[0] == "block"
+
+    # no redact patterns and no env: credentials -> data.redact is "declared"
+    charter = _charter(good_charter, data={"class": "internal"}, credentials=[])
+    rows = report(charter)
+    row = next(r for r in rows if r[1] == "data.redact")
+    assert row[0] == "declared"
+
+    # retention_days set -> data.retention is "block"
+    charter = _charter(good_charter, data={"class": "pii", "retention_days": 7})
+    rows = report(charter)
+    row = next(r for r in rows if r[1] == "data.retention")
+    assert row[0] == "block"
+
+    # no retention_days -> data.retention is "declared"
+    charter = _charter(good_charter, data={"class": "pii"})
+    rows = report(charter)
+    row = next(r for r in rows if r[1] == "data.retention")
+    assert row[0] == "declared"
+
+    # env: credential alone (no redact patterns) -> data.redact is "block"
+    charter = _charter(
+        good_charter,
+        data={"class": "pii"},
+        credentials=[{"name": "k", "ref": "env:X", "scope": "ro"}],
+    )
+    rows = report(charter)
+    row = next(r for r in rows if r[1] == "data.redact")
+    assert row[0] == "block"
 
 
 # --- 6. status is a block --------------------------------------------------------

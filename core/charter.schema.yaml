@@ -295,8 +295,11 @@ properties:
     x-enforced: block
     x-runtime: >
       Intent: logs hide the listed items and are deleted after the retention window, guarding
-      against secrets leaking into logs. The headless runner does NOT yet redact logs or
-      auto-delete them; class is recorded but advisory. See the builder report.
+      against secrets leaking into logs. The headless runner scrubs the declared `redact`
+      patterns (and the values of declared env: credentials) from saved output, the console
+      preview, and eval detail before writing, and prunes output files plus runs.jsonl entries
+      older than retention_days when it runs (housekeeping, not a daemon); `class` stays advisory.
+      See the builder report.
 
   # --- Evals: how you know it works ----------------------------------------
   evals:
