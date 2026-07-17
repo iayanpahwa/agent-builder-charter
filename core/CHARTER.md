@@ -39,4 +39,5 @@ Better a dead agent than an ungoverned one.
 `status` is the one field that changes during an *incident*, not development. Its live value
 lives in the **registry** the runtime checks before every run, so pausing an agent (or a whole
 group) is one write, not a redeploy. The file declares the *starting* status; the registry
-holds the *current* one.
+holds the *current* one. For that pause to be exact, ids must be unique — the registry refuses
+to register two agents under the same `id`.

@@ -65,6 +65,9 @@ shared, reused by every builder (one level up):
 - Credentials: the runner scopes the subprocess env to Claude's auth + OS essentials + the
   charter's declared `env:` refs; all other host secrets are dropped. Filesystem isolation
   (file-stored secrets) still needs a container.
+- Data: declared redaction patterns (and `env:` credential values) are scrubbed from saved
+  output, console, and eval detail before write; `data.retention_days` prunes old output files
+  and `runs.jsonl` entries when the agent runs (housekeeping, not a daemon).
 - `runtime` field; `egress: [any]` / `[none]` sentinels (empty egress invalid); `extensions.human_verification`.
 - Evals are optional and cheap: deterministic invariants gate the run; no pytest, no judge model.
 - Plug-ins: an agent can declare `mcp` servers / custom tools and `skills`, loaded *strict*

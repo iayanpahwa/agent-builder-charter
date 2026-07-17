@@ -14,7 +14,8 @@ logged as complete; otherwise failed. Every run appends to `logs/runs.jsonl`
 (name · timestamp · trigger · outcome · cost · invariants) and saves the full output.
 
 ## What's really enforced (headless)
-`model`, `tools` (none, so it truly can't act), `budget.steps` (`--max-turns`), and the
-wall-clock timeout are hard walls. Change the task by editing `prompts/task.md`, or pass a
-different `--prompt`. To change the rules, re-run the `new-agent` skill; never hand-edit
-`charter.yaml`.
+`model`, `tools` (none, so it truly can't act), `budget.steps` (`--max-turns`), the
+wall-clock timeout, `egress: [none]` (no network — WebFetch/WebSearch denied), and
+`data.retention_days` (old logs and saved output pruned when it runs) are hard walls.
+Change the task by editing `prompts/task.md`, or pass a different `--prompt`. To change the
+rules, re-run the `new-agent` skill; never hand-edit `charter.yaml`.

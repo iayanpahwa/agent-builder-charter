@@ -202,7 +202,7 @@ agent-builder-charter/
 
 | | Enforced walls | Status |
 |---|---|---|
-| **claude-headless** | model · tools (dangerous tools denied) · steps (`--max-turns`) · wall-clock timeout · network egress (hook) · eval gate · run log | shipped (v0.2) |
+| **claude-headless** | model · tools (dangerous tools denied) · steps (`--max-turns`) · wall-clock timeout · network egress (hook) · env-scoped credentials · log redaction · retention pruning · eval gate · run log | shipped (v0.2) |
 | **claude-sdk** | same charter, programmatic harness | next |
 | **openai-agents** / **langchain** | same charter, translated per SDK | as needed |
 
