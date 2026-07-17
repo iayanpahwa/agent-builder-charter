@@ -78,7 +78,7 @@ def test_budget_tokens_not_enforced_when_set(good_charter):
     charter = _charter(good_charter, budget={"steps": 1, "wall_clock_seconds": 60, "tokens": 50000})
     rows = report(charter)
     row = next(r for r in rows if r[1] == "budget.tokens")
-    assert row[0] == "NOT-ENFORCED"
+    assert row[0] == "none"
 
 
 def test_budget_tokens_absent_when_not_set(good_charter):
@@ -94,14 +94,14 @@ def test_approval_tier_not_enforced_with_human_approval(good_charter):
     charter = _charter(good_charter, approval_tier={"auto": [], "human_approval": ["delete_record"]})
     rows = report(charter)
     row = next(r for r in rows if r[1] == "approval_tier")
-    assert row[0] == "NOT-ENFORCED"
+    assert row[0] == "none"
 
 
 def test_approval_tier_declared_without_human_approval(good_charter):
     charter = _charter(good_charter, approval_tier={"auto": [], "human_approval": []})
     rows = report(charter)
     row = next(r for r in rows if r[1] == "approval_tier")
-    assert row[0] == "DECLARED"
+    assert row[0] == "declared"
 
 
 # --- 5. data.redact/retention ---------------------------------------------------
@@ -109,20 +109,20 @@ def test_approval_tier_declared_without_human_approval(good_charter):
 
 def test_data_redact_retention_not_enforced(good_charter):
     rows = report(good_charter)
-    matches = [r for r in rows if r[1].startswith("data") and r[0] == "NOT-ENFORCED"]
+    matches = [r for r in rows if r[1].startswith("data") and r[0] == "none"]
     assert len(matches) == 1
     note = matches[0][2].lower()
     assert "redact" in note
     assert "auto-deleted" in note
 
 
-# --- 6. status is a WALL ---------------------------------------------------------
+# --- 6. status is a block --------------------------------------------------------
 
 
-def test_status_is_wall(good_charter):
+def test_status_is_block(good_charter):
     rows = report(good_charter)
     row = next(r for r in rows if r[1] == "status")
-    assert row[0] == "WALL"
+    assert row[0] == "block"
 
 
 # --- 7. extensions ---------------------------------------------------------------
@@ -142,11 +142,11 @@ def test_extensions_row_absent_when_not_declared(good_charter):
 # --- 8. egress rows preserved ------------------------------------------------------
 
 
-def test_egress_none_is_wall(good_charter):
+def test_egress_none_is_block(good_charter):
     charter = _charter(good_charter, egress=["none"])
     rows = report(charter)
     row = next(r for r in rows if r[1] == "egress")
-    assert row[0] == "WALL"
+    assert row[0] == "block"
     assert "no network permitted" in row[2]
 
 
@@ -154,11 +154,11 @@ def test_egress_domain_list_with_webfetch_is_wall(good_charter):
     charter = _charter(good_charter, tools=["WebFetch"], egress=["docs.python.org"])
     rows = report(charter)
     row = next(r for r in rows if r[1] == "egress")
-    assert row[0] == "WALL"
+    assert row[0] == "block"
 
 
-def test_egress_any_is_not_enforced(good_charter):
+def test_egress_any_is_none(good_charter):
     charter = _charter(good_charter, egress=["any"])
     rows = report(charter)
     row = next(r for r in rows if r[1] == "egress")
-    assert row[0] == "NOT-ENFORCED"
+    assert row[0] == "none"

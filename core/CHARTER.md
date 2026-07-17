@@ -21,11 +21,12 @@ e.g. `../builders/claude-headless/run_headless.py` (the headless runner) and `cc
 (its egress hook). Nothing runtime-specific belongs here.
 
 ## How strictly each field is held (the `x-enforced` tags)
-- **R** — a hard wall: the run is blocked or killed on the spot.
-- **CI** — a release gate: a failure blocks the deploy (the evals test set).
-- **AL** — an alarm: the owner is paged (the evals live number).
-- **P** — must be filled in: the registry rejects a blank one (`id`, `version`, `owner`).
-- **none** — declared, not enforced (e.g. `runtime`, `extensions`).
+- **block** — a hard wall: the run is blocked or killed on the spot.
+- **gate** — a release gate: a failure blocks the deploy (the evals test set).
+- **alarm** — the owner is paged on breach (the evals live number).
+- **present** — must be filled in: the registry rejects a blank one (`id`, `version`, `owner`).
+- **declared** — recorded for humans/tools; no enforcement by design (e.g. `runtime`, `extensions`).
+- **none** — the charter declares it, but this runtime does not enforce it.
 
 These tags are the **intended** enforcement class — the goal for a field. What a given runtime
 **actually** enforces is reported honestly by that builder's `--dry-run` report; when they differ,

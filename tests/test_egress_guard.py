@@ -70,7 +70,7 @@ def test_non_network_tool_always_allowed(tmp_path, good_charter):
 # --- 2. run_headless.py --dry-run report -----------------------------------
 
 
-def test_dry_run_reports_none_wall_and_settings_hook(tmp_path, good_charter):
+def test_dry_run_reports_none_block_and_settings_hook(tmp_path, good_charter):
     charter_path = _write_charter(tmp_path, good_charter, tools=["WebFetch"], egress=["none"])
     env = dict(os.environ, _ZO_DOCTOR="0")
     result = subprocess.run(
@@ -81,6 +81,6 @@ def test_dry_run_reports_none_wall_and_settings_hook(tmp_path, good_charter):
         text=True,
     )
     egress_line = next(line for line in result.stdout.splitlines() if "egress" in line)
-    assert "WALL" in egress_line
+    assert "block" in egress_line
     assert "no network permitted" in egress_line
     assert "--settings" in result.stdout

@@ -34,7 +34,7 @@ When a user says "help me build a <thing> agent":
 2. **Validate:** `python3 ../../core/validate.py agents/<id>/charter.yaml` → loop to `VALID`.
 3. **Show the honest report** (no tokens):
    `python3 run_headless.py --charter agents/<id>/charter.yaml --dry-run`
-   — walk each field: `WALL` / `NOT-ENFORCED` / `ADVISORY` / `DECLARED` / `UNAVAILABLE`.
+   — walk each field: `block` / `declared` / `none` (and `—` for a field you didn't set).
 4. **Run it:** `./agents/<id>/run.sh manual` — runs headless (model/tools/turns/timeout enforced),
    gates on evals if any, marks the run complete/failed, logs to `agents/<id>/logs/runs.jsonl`.
 

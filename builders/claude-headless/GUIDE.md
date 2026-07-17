@@ -46,7 +46,7 @@ all — on purpose. A dead agent is safer than an ungoverned one.
 python3 run_headless.py --charter agents/<name>/charter.yaml --dry-run
 ```
 This prints the exact `claude -p` command it will run, and an honest report per field:
-`WALL` (really enforced), `NOT-ENFORCED`, `ADVISORY`, `DECLARED`, `UNAVAILABLE`. Read it —
+`block` (really enforced), `declared`, or `none` (and `—` for a field you didn't set). Read it —
 it tells you the truth (e.g. a dollar cap may not bite under a subscription; a real sandbox
 needs a container).
 

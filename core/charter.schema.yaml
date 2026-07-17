@@ -4,11 +4,14 @@
 # is the ONLY way the agent gets a model, tools, secrets, network, or a place to
 # run. If it is not written here, the agent cannot do it.
 #
-# Enforcement tags (see x-enforced on each field):
-#   R   the runtime blocks or kills the run if this is broken (a hard wall)
-#   CI  checked before release; a failure blocks the deploy
-#   P   must be present and filled in; the registry rejects a blank one
-#   AL  wired to an alarm; the owner gets paged if it is breached
+# Enforcement vocabulary (used by x-enforced below and by each builder's --dry-run report):
+#   block     the runtime blocks or kills the run on breach (a hard wall)
+#   gate      checked before release; a failure blocks the deploy
+#   alarm     wired to paging; the owner is alerted on breach
+#   present   must be present and filled in; a blank one is rejected
+#   declared  recorded for humans/tools; no enforcement by design
+#   none      the charter declares it, but THIS runtime does not enforce it
+# A field may carry more than one class as a list (e.g. [gate, alarm]).
 # The tag is the INTENT — the strongest enforcement class the field aims for. What a
 # given runtime ACTUALLY enforces depends on that runtime; the builder's `--dry-run`
 # report is the authoritative, honest per-runtime truth (the tag is the goal, the report is real).
@@ -33,7 +36,7 @@ properties:
     description: >
       Which version of the CHARTER schema this file was written against. Lets you
       migrate a thousand files later without guessing what each one assumed.
-    x-enforced: P
+    x-enforced: present
     x-runtime: The loader refuses a charter written for a schema version it does not understand.
 
   # --- Where this agent runs (build input, NOT a runtime wall) -------------
@@ -45,7 +48,7 @@ properties:
       own verbs like fetch_url). Well-known values: claude-code, standalone, headless.
       Other values are allowed; a builder that does not recognize one treats it as
       standalone. Optional, but the new-agent skill always sets it.
-    x-enforced: none
+    x-enforced: declared
     x-runtime: >
       A hint the BUILDER reads to emit the right tool names — not a wall. A loader
       that does not match this runtime should say so out loud, not silently ignore it.
@@ -56,7 +59,7 @@ properties:
     description: >
       Short unique name for this agent. One of a kind across the whole fleet.
       Everything else (dashboards, the off switch, search) finds the agent by this.
-    x-enforced: P
+    x-enforced: present
     x-runtime: Registry refuses a second agent with the same id.
 
   version:
@@ -65,7 +68,7 @@ properties:
     description: >
       Version of THIS file, e.g. "4". Bump it on every change. Lets you answer
       "what was this agent allowed to do last Tuesday?"
-    x-enforced: P
+    x-enforced: present
     x-runtime: Saved with every run, so each run is tied to the exact rules it ran under.
 
   owner:
@@ -79,7 +82,7 @@ properties:
       team:       {type: string, description: The team that owns this agent.}
       on_call:    {type: string, description: Who to page right now (a rotation handle or email).}
       escalation: {type: string, description: Who to go to next if on-call cannot fix it.}
-    x-enforced: P
+    x-enforced: present
     x-runtime: Deploy is blocked if any of these are blank. A human checks the content, not the machine.
 
   status:
@@ -89,7 +92,7 @@ properties:
       The on/off switch. enabled runs; paused holds new runs; killed stops it for
       good. Because it is a normal field you can search, you can turn off every
       agent that matches a condition in one query.
-    x-enforced: R
+    x-enforced: block
     x-runtime: Checked before every run. paused or killed means the run does not start.
 
   # --- Context: what it is allowed to read as trusted ----------------------
@@ -106,7 +109,7 @@ properties:
         type: array
         items: {type: string}
         description: The complete list of files the agent's prompt and rules are assembled from. If it is not here, it is not trusted.
-    x-enforced: R
+    x-enforced: block
     x-runtime: >
       Intent: the runtime tags everything the model reads as trusted or untrusted, so
       only these files count as instructions and fetched pages/memory are cleaned and
@@ -123,7 +126,7 @@ properties:
       provider: {type: string, description: "e.g. anthropic"}
       id:       {type: string, description: "e.g. claude-opus-4-8"}
       params:   {type: object, description: "Optional settings like temperature or max tokens."}
-    x-enforced: R
+    x-enforced: block
     x-runtime: Loads exactly this model. If it is retired, the agent refuses to start instead of quietly using another one.
 
   sandbox:
@@ -148,7 +151,7 @@ properties:
       persist_state:
         type: boolean
         description: Whether anything survives after the run ends. Default false.
-    x-enforced: R
+    x-enforced: block
     x-runtime: >
       Intent: start the agent inside this box so it cannot reach outside it. A headless run
       has no real sandbox — a true fs/net jail needs a container, which flags can't give. See the builder report.
@@ -167,7 +170,7 @@ properties:
       tokens:             {type: integer, description: Max tokens for one run.}
       steps:              {type: integer, description: Max loop steps for one run.}
       wall_clock_seconds: {type: integer, description: Max real time for one run.}
-    x-enforced: R
+    x-enforced: block
     x-runtime: When any ceiling is hit, the run is killed on the spot.
 
   # --- Authority: what it is allowed to touch ------------------------------
@@ -175,7 +178,7 @@ properties:
     type: array
     items: {type: string}
     description: The exact list of tools the agent may call. Nothing else is callable.
-    x-enforced: R
+    x-enforced: block
     x-runtime: Any tool call not on this list is refused before it runs.
 
   credentials:
@@ -192,7 +195,7 @@ properties:
         name:  {type: string, description: "Friendly name, e.g. price-db."}
         ref:   {type: string, description: Pointer to the secret in your vault, not the value.}
         scope: {type: string, description: "The narrow role, e.g. read-only on table X."}
-    x-enforced: R
+    x-enforced: block
     x-runtime: >
       Intent: hand the agent only these secrets, at only this scope, and nothing else. Headless
       has NO credential isolation — the agent inherits the host environment; a container is required
@@ -211,7 +214,7 @@ properties:
       use `none` as the sole entry (`egress: [none]`); the runtime blocks every network
       call, and like `any`, `none` must be the only entry. A bare `*` entry is not
       allowed (use `any`); subdomain patterns like `*.example.com` are fine.
-    x-enforced: R
+    x-enforced: block
     x-runtime: >
       The network layer refuses any connection not on this list — allowing all when the
       list is exactly [any] (open), and refusing every connection when it is exactly
@@ -236,7 +239,7 @@ properties:
           type: array
           items: {type: string}
           description: 'Which of its tools to permit: ["*"] for all (default), or specific tool names.'
-    x-enforced: R
+    x-enforced: block
     x-runtime: Only these servers are loaded (strict), and only their `allow` tools are added to the allow-list.
 
   skills:
@@ -247,7 +250,7 @@ properties:
       user, project, or plugin). The runner restricts the run to ONLY these
       (`settings.availableSkills`), so the agent can't reach every skill on the machine. A
       skill is declared behaviour; list only what the job needs.
-    x-enforced: R
+    x-enforced: block
     x-runtime: settings.availableSkills is set to exactly this list. (Version-dependent — see the CLI docs.)
 
   approval_tier:
@@ -263,7 +266,7 @@ properties:
         type: array
         items: {type: string}
         description: "Action types that must wait for a human OK, e.g. spend money, delete, send email."
-    x-enforced: R
+    x-enforced: block
     x-runtime: >
       Intent: an action in the human_approval list is held in a queue until a person approves it.
       Unattended headless has NO approval queue — such actions are contained by being left OUT of
@@ -287,7 +290,7 @@ properties:
         type: array
         items: {type: string}
         description: "Things to hide from logs, e.g. emails, tokens."
-    x-enforced: R
+    x-enforced: block
     x-runtime: >
       Intent: logs hide the listed items and are deleted after the retention window, guarding
       against secrets leaking into logs. The headless runner does NOT yet redact logs or
@@ -310,7 +313,7 @@ properties:
         properties:
           name: {type: string, description: "The one number that says it is doing its job, e.g. percent of pages parsed correctly."}
           slo:  {type: string, description: "The line it must stay above, e.g. 95%."}
-    x-enforced: "CI (suite) + AL (success_metric)"
+    x-enforced: [gate, alarm]
     x-runtime: >
       The test set must pass or the release is blocked. In production, if the
       success number drops below the line, the owner is paged.
@@ -327,5 +330,5 @@ properties:
       that a human must check this agent's OUTPUT before it is trusted. The runtime
       cannot force this, so it stays a declared expectation (the builder surfaces it
       loudly), never a wall. Use it when output quality can't be auto-verified.
-    x-enforced: none
+    x-enforced: declared
     x-runtime: Ignored by the loader. Present only so extra fields have an honest home.

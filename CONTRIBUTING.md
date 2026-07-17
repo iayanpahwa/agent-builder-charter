@@ -18,7 +18,7 @@ rules keep contributions in line with what it stands for.
   or another runtime). Reuse `core/`; don't duplicate it. Ship an honest report of
   what your runtime can and can't enforce.
 - Schema improvements in `core/charter.schema.yaml` (with the matching enforcement
-  in a builder, or a clearly-tagged `x-enforced: none`).
+  in a builder, or a clearly-tagged `x-enforced: declared`).
 - Better eval invariants in `core/eval_checks.py`.
 - Docs, examples, and honest-limit writeups.
 
