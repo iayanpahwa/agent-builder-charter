@@ -20,6 +20,10 @@ import os
 from loader import load_charter, validate
 
 
+class DuplicateAgentId(Exception):
+    """A second agent tried to register under an id already in the fleet."""
+
+
 class Registry:
     def __init__(self):
         self._agents = {}  # id -> {"charter", "status", "source"}
@@ -28,6 +32,12 @@ class Registry:
     def register(self, charter, source="<memory>"):
         validate(charter)  # fail closed: a bad charter never enters the fleet
         aid = charter["id"]
+        if aid in self._agents:  # fail closed: ids must be unique across the fleet
+            existing = self._agents[aid]["source"]
+            raise DuplicateAgentId(
+                f"agent id {aid!r} is already registered (from {existing}); "
+                f"refusing the duplicate from {source} — ids must be unique across the fleet"
+            )
         self._agents[aid] = {
             "charter": charter,
             "status": charter["status"],  # seed live status from the declared start
