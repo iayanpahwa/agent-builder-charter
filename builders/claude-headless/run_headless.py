@@ -33,6 +33,7 @@ import json
 import os
 import re
 import shlex
+import signal
 import subprocess
 import sys
 import tempfile
@@ -302,6 +303,27 @@ def _cleanup(paths):
             pass
 
 
+def _kill_process_group(proc, grace=3):
+    """Kill the whole process group, not just `claude` — subprocess reaps only the
+    direct child on timeout, so MCP/Bash grandchildren would orphan and keep running."""
+    try:
+        pgid = os.getpgid(proc.pid)
+    except ProcessLookupError:
+        return                       # already gone
+    try:
+        os.killpg(pgid, signal.SIGTERM)
+    except ProcessLookupError:
+        return
+    try:
+        proc.communicate(timeout=grace)   # let it exit gracefully; drains the pipes
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(pgid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        proc.communicate()                # reap
+
+
 _ESSENTIAL_VARS = ("PATH", "HOME", "USER", "LOGNAME", "SHELL", "TERM", "TMPDIR", "TZ", "LANG")
 _ESSENTIAL_PREFIXES = ("LC_", "ANTHROPIC_", "CLAUDE_")  # locale + Claude Code's own auth/config
 
@@ -385,29 +407,33 @@ def main():
     timeout = (charter.get("budget") or {}).get("wall_clock_seconds", 120)
     t0 = time.time()
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout,
-                              env=scoped_env(charter))  # scoped: Claude's auth + declared env: creds only; fs isolation still needs a container
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                text=True, env=scoped_env(charter),  # scoped: Claude's auth + declared env: creds only; fs isolation still needs a container
+                                start_new_session=True)  # own process group so timeout can reap grandchildren
+    except FileNotFoundError:
+        print("REFUSED: `claude` CLI not found on PATH.")
+        _cleanup(tmpfiles)
+        sys.exit(6)
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout)
         elapsed = round(time.time() - t0, 1)
     except subprocess.TimeoutExpired:
         elapsed = round(time.time() - t0, 1)
+        _kill_process_group(proc)  # kill claude AND anything it spawned, not just the direct child
         print(f"\nKILLED: wall-clock timeout {timeout}s hit")
         log_run(charter_dir, {"name": name, "timestamp": now(), "trigger": args.trigger,
                               "model": charter["model"]["id"], "outcome": "timeout", "duration_s": elapsed})
         _cleanup(tmpfiles)
         sys.exit(5)
-    except FileNotFoundError:
-        print("REFUSED: `claude` CLI not found on PATH.")
-        _cleanup(tmpfiles)
-        sys.exit(6)
     _cleanup(tmpfiles)
 
     result, cost = "", None
     try:
-        data = json.loads(proc.stdout)
+        data = json.loads(stdout)
         result = data.get("result", "") or ""
         cost = data.get("total_cost_usd")
     except Exception:  # noqa: BLE001
-        result = (proc.stdout or "").strip()
+        result = (stdout or "").strip()
 
     invariants, outcome = [], "ran"
     if args.eval:
@@ -452,7 +478,7 @@ def main():
     else:
         print("\n(ran; no eval gate — add evals + pass --eval to gate on invariants)")
     if proc.returncode != 0:
-        print(f"[claude exit {proc.returncode}] {(proc.stderr or '')[:300]}")
+        print(f"[claude exit {proc.returncode}] {(stderr or '')[:300]}")
     if outcome == "failed":
         sys.exit(1)   # eval gate failed → non-zero so cron/callers can tell
 
