@@ -107,8 +107,10 @@ properties:
     properties:
       trusted_sources:
         type: array
-        items: {type: string}
-        description: The complete list of files the agent's prompt and rules are assembled from. If it is not here, it is not trusted.
+        items:
+          type: string
+          pattern: '^(?!/)(?!.*(?:^|/)\.\.(?:/|$)).+$'   # relative path, no .. segments — must stay inside the agent dir
+        description: The complete list of files the agent's prompt and rules are assembled from (relative paths inside the agent dir; no absolute paths or ".."). If it is not here, it is not trusted.
     x-enforced: block
     x-runtime: >
       Intent: the runtime tags everything the model reads as trusted or untrusted, so

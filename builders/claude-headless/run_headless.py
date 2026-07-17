@@ -137,9 +137,15 @@ def prune_logs(charter_dir, retention_days):
 # --- building the enforced command ---------------------------------------
 def _system_prompt_file(charter, charter_dir):
     srcs = (charter.get("context") or {}).get("trusted_sources", []) or []
+    base = os.path.realpath(charter_dir)
     text = ""
     for s in srcs:
-        p = os.path.join(charter_dir, s)
+        p = os.path.realpath(os.path.join(charter_dir, s))
+        if p != base and not p.startswith(base + os.sep):
+            raise CharterInvalid(
+                f"context.trusted_sources: '{s}' escapes the charter directory; "
+                f"sources must be files inside {charter_dir}"
+            )
         if os.path.exists(p):
             with open(p) as f:
                 text += f.read() + "\n\n"
@@ -356,7 +362,13 @@ def main():
         print("REFUSED: no task prompt (pass --prompt, or add prompts/task.md)")
         sys.exit(4)
 
-    cmd, tmpfiles = build_command(charter, charter_dir, charter_path, prompt)
+    try:
+        cmd, tmpfiles = build_command(charter, charter_dir, charter_path, prompt)
+    except CharterInvalid as e:
+        print(f"REFUSED: {e}")
+        log_run(charter_dir, {"name": name, "timestamp": now(), "trigger": args.trigger,
+                              "outcome": "refused", "reason": str(e)})
+        sys.exit(2)
 
     print(f"\n=== headless run: {name} (trigger={args.trigger}) ===")
     print("what this run enforces:")
