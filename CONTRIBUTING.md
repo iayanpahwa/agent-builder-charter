@@ -29,6 +29,8 @@ rules keep contributions in line with what it stands for.
 3. Examples must not contain real names, emails, internal hostnames, or company
    details. Use `example.com` / `@owner` placeholders.
 4. Validate any charter you touch: `python3 core/validate.py <charter>`.
+5. Run the tests: `python3 -m pytest -q`. See [`TESTING.md`](TESTING.md) for what the
+   suite covers and how to add to it. New enforcement needs a test that fails without it.
 
 ## Licensing of contributions
 Code contributions are under **Apache-2.0**; contributions to the `framework/`

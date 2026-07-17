@@ -224,8 +224,8 @@ credit the project: name agent-builder-charter and link back to this repo or to
 ## Contributing
 
 New builders, schema improvements, and eval invariants are the most welcome contributions;
-see [`CONTRIBUTING.md`](CONTRIBUTING.md). The one rule that can't bend: *never claim a
-control that nothing enforces.*
+see [`CONTRIBUTING.md`](CONTRIBUTING.md), and [`TESTING.md`](TESTING.md) for how to run and
+write the tests. The one rule that can't bend: *never claim a control that nothing enforces.*
 
 ## Disclaimer
 
