@@ -17,7 +17,7 @@ reuses (they don't duplicate it):
 - `examples/price-watch-scraper.charter.yaml` — a standalone charter, used by the demos.
 
 The **per-runtime** pieces (how a charter becomes a *runnable* agent) live in each builder —
-e.g. `../builders/claude-headless/run_headless.py` (the headless runner) and `cc_guard.py`
+e.g. `../builders/claude-headless/run_headless.py` (the headless runner) and `egress_guard.py`
 (its egress hook). Nothing runtime-specific belongs here.
 
 ## How strictly each field is held (the `x-enforced` tags)

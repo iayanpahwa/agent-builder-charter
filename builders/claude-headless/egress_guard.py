@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-cc_guard — a PreToolUse hook that enforces a charter's EGRESS on network tools.
+egress_guard — a PreToolUse hook that enforces a charter's EGRESS on network tools.
 
 `run_headless.py` passes this to `claude -p` via `--settings`, with a matcher limited to
 WebFetch|WebSearch. Because a headless run is its own isolated process, the hook is
@@ -14,7 +14,7 @@ means open (allow all). The settings block it is wired with:
   {"hooks": {"PreToolUse": [
     {"matcher": "WebFetch|WebSearch", "hooks": [
       {"type": "command",
-       "command": "python3 /abs/cc_guard.py --charter /abs/agents/<id>/charter.yaml"}]}]}}
+       "command": "python3 /abs/egress_guard.py --charter /abs/agents/<id>/charter.yaml"}]}]}}
 """
 
 import argparse
@@ -61,7 +61,7 @@ def main():
     try:
         event = json.loads(raw) if raw.strip() else {}
     except json.JSONDecodeError:
-        decision(True, "cc_guard: no parseable tool event; not blocking")
+        decision(True, "egress_guard: no parseable tool event; not blocking")
 
     tool = event.get("tool_name", "")
     tool_input = event.get("tool_input", {}) or {}
@@ -69,18 +69,18 @@ def main():
     # Only network tools are gated. Everything else ALWAYS passes — this is what keeps
     # the hook from ever deadlocking the session (Bash/Read/Edit/Task are never denied).
     if tool not in NET_TOOLS:
-        decision(True, f"cc_guard: '{tool}' is not a network tool; egress hook does not gate it")
+        decision(True, f"egress_guard: '{tool}' is not a network tool; egress hook does not gate it")
 
     try:
         charter = load_charter(args.charter)   # fail closed if the charter is invalid
     except Exception as e:  # noqa: BLE001 - any load failure must fail closed
-        decision(False, f"cc_guard: cannot load charter ({e}); failing closed on this network call")
+        decision(False, f"egress_guard: cannot load charter ({e}); failing closed on this network call")
 
     egress = charter.get("egress", []) or []
     if "any" in egress:
-        decision(True, f"cc_guard: egress is open ([any]); '{tool}' allowed by charter '{charter['id']}'")
+        decision(True, f"egress_guard: egress is open ([any]); '{tool}' allowed by charter '{charter['id']}'")
     if "none" in egress:
-        decision(False, f"cc_guard: egress is [none] (no network); '{tool}' denied by charter '{charter['id']}'")
+        decision(False, f"egress_guard: egress is [none] (no network); '{tool}' denied by charter '{charter['id']}'")
 
     key = NET_TOOLS[tool]
     url = tool_input.get(key) if key else None
@@ -88,12 +88,12 @@ def main():
         # Reached only with a scoped egress list ([any]/[none] handled above). A tool with no
         # checkable URL (WebSearch) can't be confined to an allow-list — deny it. Use egress:[any]
         # to permit open search, or drop WebSearch from tools.
-        decision(False, f"cc_guard: '{tool}' has no host to check against egress {egress}; a scoped allow-list can't confine it — use egress:[any] to permit it or drop {tool}")
+        decision(False, f"egress_guard: '{tool}' has no host to check against egress {egress}; a scoped allow-list can't confine it — use egress:[any] to permit it or drop {tool}")
 
     host = urlparse(url).hostname or ""
     if host_allowed(host, egress):
-        decision(True, f"cc_guard: egress to '{host}' allowed by charter '{charter['id']}'")
-    decision(False, f"cc_guard: egress to '{host}' not in charter egress {egress}")
+        decision(True, f"egress_guard: egress to '{host}' allowed by charter '{charter['id']}'")
+    decision(False, f"egress_guard: egress to '{host}' not in charter egress {egress}")
 
 
 if __name__ == "__main__":

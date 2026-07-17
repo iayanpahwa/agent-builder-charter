@@ -11,7 +11,7 @@ Real walls in headless (this is why headless beats the interactive-subagent path
   tools                      -> --allowedTools + --disallowedTools (dangerous tools denied)
   budget.steps               -> --max-turns   (hard stop)
   budget.wall_clock_seconds  -> subprocess timeout (hard kill)
-  egress (specific list)     -> --settings PreToolUse hook (cc_guard); process-scoped, clean
+  egress (specific list)     -> --settings PreToolUse hook (egress_guard); process-scoped, clean
   context.trusted_sources    -> --append-system-prompt-file (concatenated)
   status                     -> refuses to run unless 'enabled'
   data.redact/retention      -> declared patterns + env: cred values scrubbed from logs; old logs pruned past retention_days.
@@ -182,7 +182,7 @@ def _settings_file(charter, charter_path):
     egress = charter.get("egress", []) or []
     tools = charter.get("tools", []) or []
     if (NET_TOOLS & set(tools)) and egress and "any" not in egress:
-        guard = os.path.join(HERE, "cc_guard.py")
+        guard = os.path.join(HERE, "egress_guard.py")
         settings["hooks"] = {"PreToolUse": [
             {"matcher": "WebFetch|WebSearch", "hooks": [
                 {"type": "command", "command": f"python3 {guard} --charter {charter_path}"}]}]}

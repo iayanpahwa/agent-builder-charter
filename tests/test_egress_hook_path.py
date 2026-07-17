@@ -1,15 +1,15 @@
-"""Regression tests for the cc_guard hook's charter path in run_headless.py's _settings_file.
+"""Regression tests for the egress_guard hook's charter path in run_headless.py's _settings_file.
 
 Bug: `_settings_file` used to hardcode the hook's --charter argument as
 `<charter_dir>/charter.yaml`, regardless of what the charter file was actually named. A charter
-saved under any other name got the hook wired to a nonexistent path, cc_guard's `load_charter`
+saved under any other name got the hook wired to a nonexistent path, egress_guard's `load_charter`
 raised, and the guard failed closed -- denying ALL web fetches, even ones the charter's egress
 list explicitly allowed.
 
 The fix threads the real charter path through: `_settings_file(charter, charter_path)` now
 writes `charter_path` (not a fabricated `charter.yaml` join) into the hook command.
 
-No tokens, no real network -- cc_guard only parses the URL string in the tool event.
+No tokens, no real network -- egress_guard only parses the URL string in the tool event.
 """
 
 import copy
@@ -24,7 +24,7 @@ from conftest import REPO_ROOT
 sys.path.insert(0, str(REPO_ROOT / "builders" / "claude-headless"))
 from run_headless import _settings_file  # noqa: E402
 
-CC_GUARD = REPO_ROOT / "builders" / "claude-headless" / "cc_guard.py"
+EGRESS_GUARD = REPO_ROOT / "builders" / "claude-headless" / "egress_guard.py"
 
 
 def _hook_charter_arg(settings_file_path):
@@ -87,7 +87,7 @@ def test_end_to_end_chain_catches_the_regression(tmp_path, good_charter):
         argv = shlex.split(command)
 
         # Before the fix, the hook's --charter path was bogus (a nonexistent charter.yaml next
-        # to a differently-named file), so cc_guard's load_charter raised and it failed closed --
+        # to a differently-named file), so egress_guard's load_charter raised and it failed closed --
         # this on-list URL would come back "deny" instead of "allow".
         assert _run_guard(argv, "https://docs.python.org/3/") == "allow"
         assert _run_guard(argv, "https://evil.example.com/") == "deny"

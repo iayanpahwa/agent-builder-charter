@@ -1,6 +1,6 @@
-"""Tests for cc_guard.py's runtime egress decisions and run_headless.py's dry-run report.
+"""Tests for egress_guard.py's runtime egress decisions and run_headless.py's dry-run report.
 
-cc_guard only inspects the URL string in the tool event — it never fetches anything, so
+egress_guard only inspects the URL string in the tool event — it never fetches anything, so
 these tests run via subprocess with no tokens and no real network calls.
 """
 
@@ -15,7 +15,7 @@ import pytest
 
 from conftest import REPO_ROOT
 
-CC_GUARD = REPO_ROOT / "builders" / "claude-headless" / "cc_guard.py"
+EGRESS_GUARD = REPO_ROOT / "builders" / "claude-headless" / "egress_guard.py"
 RUN_HEADLESS = REPO_ROOT / "builders" / "claude-headless" / "run_headless.py"
 
 
@@ -31,7 +31,7 @@ def _write_charter(tmp_path, good_charter, *, tools, egress):
 def _run_guard(charter_path, event):
     env = dict(os.environ, _ZO_DOCTOR="0")
     result = subprocess.run(
-        [sys.executable, str(CC_GUARD), "--charter", str(charter_path)],
+        [sys.executable, str(EGRESS_GUARD), "--charter", str(charter_path)],
         cwd=str(REPO_ROOT),
         env=env,
         input=json.dumps(event),
@@ -42,7 +42,7 @@ def _run_guard(charter_path, event):
     return decision["hookSpecificOutput"]["permissionDecision"]
 
 
-# --- 1. cc_guard egress decisions -------------------------------------------
+# --- 1. egress_guard egress decisions -------------------------------------------
 
 
 @pytest.mark.parametrize(

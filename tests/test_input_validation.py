@@ -7,7 +7,7 @@ Covers three surfaces:
   2. Schema patterns enforced via `validate` — `tools[]` items must match
      `^[A-Za-z0-9_.*-]+$` (no commas/spaces) and `mcp[].name` must match
      `^[A-Za-z0-9_.-]+$`.
-  3. cc_guard.host_allowed direct unit tests — the old `lstrip("*.")` bypass (which
+  3. egress_guard.host_allowed direct unit tests — the old `lstrip("*.")` bypass (which
      let a trailing-dot host slip through) is closed.
 """
 
@@ -20,7 +20,7 @@ from conftest import REPO_ROOT
 
 sys.path.insert(0, str(REPO_ROOT / "builders" / "claude-headless"))
 from loader import validate, CharterInvalid
-from cc_guard import host_allowed
+from egress_guard import host_allowed
 
 # --- 1. Egress: malformed entries are rejected -----------------------------
 
@@ -106,7 +106,7 @@ def test_mcp_valid_name_does_not_raise(good_charter):
     validate(good_charter)  # must not raise
 
 
-# --- 5. cc_guard.host_allowed: the lstrip("*.") bypass is closed -----------
+# --- 5. egress_guard.host_allowed: the lstrip("*.") bypass is closed -----------
 
 
 def test_host_allowed_trailing_dot_bare_star_denied():
@@ -117,7 +117,7 @@ def test_host_allowed_trailing_dot_empty_pattern_denied():
     assert host_allowed("evil.com.", [""]) is False
 
 
-# --- 6. cc_guard.host_allowed: sanity cases ---------------------------------
+# --- 6. egress_guard.host_allowed: sanity cases ---------------------------------
 
 
 @pytest.mark.parametrize(

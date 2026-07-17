@@ -35,7 +35,7 @@ builders/claude-headless/           # open THIS in Claude Code
 ├── CLAUDE.md                       # what Claude Code auto-reads to drive the interview
 ├── README.md · GUIDE.md            # the map · the step-by-step
 ├── run_headless.py                 # THE RUNNER: charter -> enforced `claude -p` + eval gate + logging
-├── cc_guard.py                     # the egress hook the runner passes via --settings
+├── egress_guard.py                 # the egress hook the runner passes via --settings
 ├── examples/repo-researcher.charter.yaml   # a headless example agent
 ├── agents/                         # YOUR agents (generated; empty on a fresh clone)
 └── .claude/skills/{new-agent, run-evals}    # COMMITTED: you get these on clone
