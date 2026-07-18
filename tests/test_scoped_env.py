@@ -41,6 +41,21 @@ def test_claude_auth_kept_via_prefixes(monkeypatch):
     assert result["ANTHROPIC_AUTH_TOKEN"] == "t"
 
 
+def test_config_dir_tilde_expanded(monkeypatch):
+    # A subprocess doesn't expand a leading '~'; forwarding it verbatim makes the child
+    # claude create a literal './~/...' dir under its cwd. scoped_env must expand it.
+    monkeypatch.setenv("HOME", "/home/x")
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", "~/.claude-zyte-work")
+    result = scoped_env({})
+    assert result["CLAUDE_CONFIG_DIR"] == "/home/x/.claude-zyte-work"
+    assert not result["CLAUDE_CONFIG_DIR"].startswith("~")
+
+
+def test_absolute_config_dir_left_alone(monkeypatch):
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", "/cfg")
+    assert scoped_env({})["CLAUDE_CONFIG_DIR"] == "/cfg"
+
+
 def test_declared_env_ref_passed_through(monkeypatch):
     monkeypatch.setenv("MY_DB_PW", "secret")
     charter = {"credentials": [{"name": "db", "ref": "env:MY_DB_PW", "scope": "ro"}]}

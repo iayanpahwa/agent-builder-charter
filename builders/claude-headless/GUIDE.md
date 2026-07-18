@@ -10,16 +10,19 @@ runner reads that rulebook and blocks anything not on it. The agent runs **headl
 
 ## Before you start
 - **Claude Code** (to run the interview) + the **`claude` CLI** on your PATH (to run the agent).
-- **Python 3 with PyYAML**: `pip install pyyaml`.
-- Be in this `builder/` folder.
+- **Python 3** + the deps: `pip install -r ../../requirements.txt` (PyYAML + jsonschema).
+- Open the **repo root** in Claude Code (the interview lives there); your agent lands in this builder.
 
 ## Step 1 — Make the agent (don't write the rulebook by hand)
-In Claude Code, say: *"use the new-agent skill to make a &lt;thing&gt; agent."* It asks the
-**name first**, then plain questions — what it does, which tools, how bad if it goes wrong,
-who owns it — and writes a self-contained project under `agents/<name>/`:
+In Claude Code (repo root), say: *"use the new-agent skill to make a &lt;thing&gt; agent."*
+The framework-neutral interview asks the **name first**, then which **runtime** (pick
+`headless`), then plain questions — what it does, what it can touch, how bad if it goes wrong,
+who owns it — captures a **brief**, and hands off to the `create-headless-agent` generator,
+which writes a self-contained project under `builders/claude-headless/agents/<name>/`:
 
 ```
 agents/<name>/
+├── brief.yaml         # the neutral chart your answers produced
 ├── charter.yaml         # the rulebook
 ├── prompts/
 │   ├── system.md        # the agent's instructions
@@ -36,14 +39,14 @@ number that says it's doing its job.
 
 ## Step 3 — Check the rulebook is valid
 ```bash
-python3 ../../core/validate.py agents/<name>/charter.yaml
+python3 core/validate.py builders/claude-headless/agents/<name>/charter.yaml
 ```
 `VALID`, or it tells you what's missing. A broken rulebook means the agent won't start at
 all — on purpose. A dead agent is safer than an ungoverned one.
 
 ## Step 4 — See what's really enforced (no tokens)
 ```bash
-python3 run_headless.py --charter agents/<name>/charter.yaml --dry-run
+python3 builders/claude-headless/run_headless.py --charter builders/claude-headless/agents/<name>/charter.yaml --dry-run
 ```
 This prints the exact `claude -p` command it will run, and an honest report per field:
 `block` (really enforced), `declared`, or `none` (and `—` for a field you didn't set). Read it —
@@ -52,7 +55,7 @@ needs a container).
 
 ## Step 5 — Run it
 ```bash
-./agents/<name>/run.sh manual        # or: cron / webhook / whatever triggered it
+./builders/claude-headless/agents/<name>/run.sh manual        # or: cron / webhook / whatever triggered it
 ```
 This runs the agent **headless**, enforced by its charter (pinned model, only its tools,
 a hard turn limit, a wall-clock timeout). If it has evals, the output is checked against
@@ -62,13 +65,14 @@ outcome · cost) and saves the full output.
 
 ## Step 6 — Concept demos (optional)
 ```bash
-python3 ../../core/loader.py       # watch the guard pause / budget-kill / tool-deny an agent
-python3 ../../core/registry.py     # the fleet board: pause every pii agent in one query
+python3 core/loader.py       # watch the guard pause / budget-kill / tool-deny an agent
+python3 core/registry.py     # the fleet board: pause every pii agent in one query
 ```
 
 ## Changing an agent later
-Don't hand-edit the rulebook. Re-run the `new-agent` skill — it updates the file and bumps
-its version, so you always know what the agent was allowed to do, and when.
+Don't hand-edit the rulebook. Re-run the `new-agent` interview (or the `create-headless-agent`
+generator against the edited `brief.yaml`) — it updates the file and bumps its version, so you
+always know what the agent was allowed to do, and when.
 
 ## The one rule to remember
 You can leave things out of a rulebook if you don't need them. But **never let a rulebook

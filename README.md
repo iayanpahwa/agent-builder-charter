@@ -122,23 +122,28 @@ You need Claude Code, the `claude` CLI on your PATH, and Python 3. Install the P
 with `pip install -r requirements.txt` (PyYAML + jsonschema).
 
 ```bash
-# 1. Open the builder in Claude Code
-cd builders/claude-headless
+# 1. Open this repo in Claude Code (the root — the interview lives here)
+cd agent-builder-charter   # or wherever you cloned it
 ```
 
-2. Tell Claude Code what you want: *"help me build a release-notes summarizer agent."* It runs
-   the new-agent interview: it asks the name first, then plain questions (it never silently
-   decides your model, budget, tools, or network), and offers a plug-in round (extra `.md`
-   files, MCP servers, skills).
-3. It writes a self-contained project at `agents/<id>/` (the charter, prompts, optional evals,
-   and `run.sh`) and validates it.
+2. Tell Claude Code what you want: *"help me build a release-notes summarizer agent."* The
+   framework-neutral **new-agent** interview runs: it asks the name first, then which runtime
+   to build for (`headless` is built; the others are planned), then plain questions (it never
+   silently decides your model, budget, capabilities, or network), and offers a plug-in round
+   (extra `.md` files, MCP servers, skills).
+3. It captures a **brief** (the neutral chart of your answers) and hands off to the runtime's
+   generator — for headless, **create-headless-agent** — which re-confirms the concretized
+   safety values (exact model id, tool names, egress hosts), writes a self-contained project at
+   `builders/claude-headless/agents/<id>/` (the brief, charter, prompts, optional evals, and
+   `run.sh`), and validates it.
 
 ```bash
 # 4. See what's REALLY enforced (no tokens spent)
-python3 run_headless.py --charter agents/<id>/charter.yaml --dry-run
+python3 builders/claude-headless/run_headless.py \
+  --charter builders/claude-headless/agents/<id>/charter.yaml --dry-run
 
 # 5. Run it, headless, enforced, eval-gated, logged
-./agents/<id>/run.sh manual
+./builders/claude-headless/agents/<id>/run.sh manual
 ```
 
 Prefer to see the ideas first? `python3 core/loader.py` (per-run enforcement) and
@@ -183,17 +188,19 @@ works under launchd, a systemd timer, a CI cron, or any orchestrator; they all j
 2. **It fails closed.** A missing, malformed, or invalid charter means the agent doesn't start.
    Better a dead agent than an ungoverned one.
 3. **Memory and fetched content are untrusted:** data, never instructions, no matter what they say.
-4. **Charters are generated, never hand-written:** an interview writes them and bumps versions,
-   so you always know what an agent was allowed to do, and when.
+4. **Charters are generated, never hand-written:** a framework-neutral interview captures a
+   brief, a per-runtime generator turns it into the charter and bumps versions, so you always
+   know what an agent was allowed to do, and when.
 
 ## Repository layout
 
 ```
 agent-builder-charter/
+├── .claude/skills/     the build skills: new-agent (neutral interview) · create-headless-agent (generator)
 ├── framework/          the one-page doctrine (why), CC BY 4.0
 ├── core/               the shared, runtime-neutral engine (schema · validator · loader · eval checks · demos)
 └── builders/           each turns a charter into a runnable, enforced agent for one runtime
-    ├── claude-headless/   built: interviews you in Claude Code, runs the agent via `claude -p`
+    ├── claude-headless/   built: runs the agent via `claude -p`; holds the runner + the run-evals skill
     ├── claude-sdk/        planned: Claude Agent SDK
     ├── openai-agents/     planned: OpenAI Agents SDK
     └── langchain/         planned: LangChain agents

@@ -10,19 +10,23 @@ model, tools, turns, timeout, network, and environment all come from the charter
 in the file, the agent can't do it.**
 
 ## Quickstart: build your own agent
-You need Claude Code (to run the interview), a terminal, and Python 3 with PyYAML.
+You need Claude Code (to run the interview), a terminal, and Python 3 (deps:
+`pip install -r ../../requirements.txt`).
 
-1. Open this folder (`builders/claude-headless/`) in Claude Code, terminal beside it.
-2. Say what you want, e.g. *"Help me build a release-notes summarizer agent."*
-   Claude Code reads `CLAUDE.md` and runs the **new-agent** interview. It asks the name
-   first, then plain questions (never silently deciding model, budget, tools, or egress), and
-   offers a plug-in round (extra `.md` files, MCP servers, skills).
-3. It generates a self-contained project at `agents/<id>/`: the charter, `prompts/`, optional
-   `evals/`, and `run.sh`, the artifact. It validates the charter for you.
-4. See what's really enforced (no tokens):
-   `python3 run_headless.py --charter agents/<id>/charter.yaml --dry-run`
-5. Run it: `./agents/<id>/run.sh manual`. It runs the agent headless (enforced), gates on its
-   evals, marks the run complete or failed, and logs it.
+The **interview lives at the repo root.** Open the repo root in Claude Code and say what you
+want, e.g. *"Help me build a release-notes summarizer agent."* The framework-neutral
+**new-agent** interview asks the name first, then which runtime (pick `headless`), then plain
+questions (never silently deciding model, budget, capabilities, or network), and offers a
+plug-in round (extra `.md` files, MCP servers, skills). It captures a **brief** and hands off
+to **create-headless-agent** (this builder's generator), which re-confirms the concretized
+safety values and generates a self-contained project at `agents/<id>/` here: the `brief.yaml`,
+charter, `prompts/`, optional `evals/`, and `run.sh` (the artifact). It validates the charter.
+
+Then, from this folder:
+- See what's really enforced (no tokens):
+  `python3 run_headless.py --charter agents/<id>/charter.yaml --dry-run`
+- Run it: `./agents/<id>/run.sh manual` — headless (enforced), gates on evals, marks the run
+  complete or failed, and logs it.
 
 Want to see the ideas first? `python3 ../../core/loader.py` (enforcement) and
 `python3 ../../core/registry.py` (the fleet board / off-switch).
@@ -31,23 +35,28 @@ Want to see the ideas first? `python3 ../../core/loader.py` (enforcement) and
 
 ## What's here
 ```
-builders/claude-headless/           # open THIS in Claude Code
+builders/claude-headless/           # the headless builder: runner + your generated agents
 ├── CLAUDE.md                       # what Claude Code auto-reads to drive the interview
 ├── README.md · GUIDE.md            # the map · the step-by-step
 ├── run_headless.py                 # THE RUNNER: charter -> enforced `claude -p` + eval gate + logging
 ├── egress_guard.py                 # the egress hook the runner passes via --settings
 ├── examples/repo-researcher.charter.yaml   # a headless example agent
 ├── agents/                         # YOUR agents (generated; empty on a fresh clone)
-└── .claude/skills/{new-agent, run-evals}    # COMMITTED: you get these on clone
+└── .claude/skills/run-evals              # COMMITTED: the post-generation eval helper (builder-local)
 
 shared, reused by every builder (one level up):
 ../../core/       charter.schema.yaml · CHARTER.md · validate.py · loader.py · registry.py · eval_checks.py
 ../../framework/  the one-page doctrine
 ```
 
+The build skills (`new-agent` interview, `create-headless-agent` generator) live at the
+**repo root** `.claude/skills/` so they're discoverable wherever you open Claude Code; only the
+builder-local **run-evals** helper lives here.
+
 ## How it fits together
 ```
-1. AUTHOR    the new-agent skill interviews you (name first) and writes the agent project (never by hand)
+1. AUTHOR    the root new-agent interview (name first, framework-neutral) captures a brief; the
+             create-headless-agent generator turns it into the agent project (never by hand)
 2. VALIDATE  ../../core/validate.py checks the charter (fail closed)
 3. REPORT    run_headless.py --dry-run prints, honestly, what each field really enforces
 4. RUN       run.sh -> run_headless.py IS the door: model / tools / turns / timeout / egress enforced

@@ -18,4 +18,5 @@ logged as complete; otherwise failed. Every run appends to `logs/runs.jsonl`
 wall-clock timeout, `egress: [none]` (no network — WebFetch/WebSearch denied), and
 `data.retention_days` (old logs and saved output pruned when it runs) are hard walls.
 Change the task by editing `prompts/task.md`, or pass a different `--prompt`. To change the
-rules, re-run the `new-agent` skill; never hand-edit `charter.yaml`.
+rules, re-run the `new-agent` interview (or the `create-headless-agent` generator against
+`brief.yaml`); never hand-edit `charter.yaml`.

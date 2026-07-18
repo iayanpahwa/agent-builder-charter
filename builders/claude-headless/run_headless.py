@@ -348,6 +348,12 @@ def scoped_env(charter):
     for k in src:
         if k.startswith(_ESSENTIAL_PREFIXES):
             env[k] = src[k]
+    # A subprocess doesn't expand a leading '~' the way an interactive shell does, so a
+    # CLAUDE_CONFIG_DIR like '~/.config' would make the child `claude` create a literal
+    # './~/...' dir under its cwd. Expand it to an absolute path before forwarding.
+    cfg = env.get("CLAUDE_CONFIG_DIR")
+    if cfg and cfg.startswith("~"):
+        env["CLAUDE_CONFIG_DIR"] = os.path.expanduser(cfg)
     for cred in charter.get("credentials") or []:
         ref = cred.get("ref", "")
         if ref.startswith("env:"):
