@@ -120,3 +120,36 @@ def test_runtime_valid_source_is_read(tmp_path):
 )
 def test_runtime_no_sources_returns_none(tmp_path, charter):
     assert _system_prompt_file(charter, str(tmp_path)) is None
+
+
+# --- 7. Runtime layer: a missing trusted source fails closed ----------------
+
+
+def test_runtime_missing_source_raises(tmp_path, good_charter):
+    """A trusted_sources entry that names a file not present on disk (but inside
+    the charter dir, so it isn't caught by the escape check) must fail closed
+    with CharterInvalid rather than silently dropping the source."""
+    charter = copy.deepcopy(good_charter)
+    charter["context"]["trusted_sources"] = ["prompts/does-not-exist.md"]
+    with pytest.raises(CharterInvalid):
+        _system_prompt_file(charter, str(tmp_path))
+
+
+def test_runtime_existing_source_still_read(tmp_path, good_charter):
+    """Regression: a trusted_sources file that DOES exist still works — the
+    fail-closed fix for missing files must not break the happy path."""
+    charter = copy.deepcopy(good_charter)
+    prompts_dir = tmp_path / "prompts"
+    prompts_dir.mkdir()
+    known_text = "REGRESSION_TRUSTED_SOURCE_EXISTS_67890"
+    (prompts_dir / "system.md").write_text(known_text)
+    charter["context"]["trusted_sources"] = ["prompts/system.md"]
+
+    result = _system_prompt_file(charter, str(tmp_path))
+    try:
+        assert result is not None
+        with open(result) as f:
+            content = f.read()
+        assert known_text in content
+    finally:
+        os.remove(result)

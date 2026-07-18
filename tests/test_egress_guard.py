@@ -25,6 +25,11 @@ def _write_charter(tmp_path, good_charter, *, tools, egress):
     charter["egress"] = egress
     charter_file = tmp_path / "charter.yaml"
     charter_file.write_text(yaml.safe_dump(charter))
+    # The runner fails closed on a missing trusted source, so materialize each one.
+    for src in (charter.get("context") or {}).get("trusted_sources", []) or []:
+        f = tmp_path / src
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text("test system prompt\n")
     return charter_file
 
 

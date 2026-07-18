@@ -147,9 +147,14 @@ def _system_prompt_file(charter, charter_dir):
                 f"context.trusted_sources: '{s}' escapes the charter directory; "
                 f"sources must be files inside {charter_dir}"
             )
-        if os.path.exists(p):
-            with open(p) as f:
-                text += f.read() + "\n\n"
+        if not os.path.exists(p):
+            raise CharterInvalid(
+                f"context.trusted_sources: '{s}' does not exist at {p}; "
+                f"a trusted source that isn't on disk fails closed rather than "
+                f"silently running on a weaker prompt"
+            )
+        with open(p) as f:
+            text += f.read() + "\n\n"
     if not text.strip():
         return None
     fd, path = tempfile.mkstemp(suffix=".sysprompt.txt")
