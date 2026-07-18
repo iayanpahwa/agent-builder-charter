@@ -118,7 +118,8 @@ evals:
 
 ## Quickstart: build and run an agent
 
-You need Claude Code, the `claude` CLI on your PATH, and Python 3 with PyYAML.
+You need Claude Code, the `claude` CLI on your PATH, and Python 3. Install the Python deps
+with `pip install -r requirements.txt` (PyYAML + jsonschema).
 
 ```bash
 # 1. Open the builder in Claude Code
