@@ -86,6 +86,9 @@ def test_end_to_end_chain_catches_the_regression(tmp_path, good_charter):
         command = settings["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
         argv = shlex.split(command)
 
+        # the hook must invoke the real egress_guard.py (renamed from cc_guard.py)
+        assert str(EGRESS_GUARD) in argv
+
         # Before the fix, the hook's --charter path was bogus (a nonexistent charter.yaml next
         # to a differently-named file), so egress_guard's load_charter raised and it failed closed --
         # this on-list URL would come back "deny" instead of "allow".
