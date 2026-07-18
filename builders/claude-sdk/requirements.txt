@@ -1,0 +1,3 @@
+# Also needs the `claude` CLI (Node) on PATH, already authenticated. Unlike the
+# TypeScript SDK, the Python SDK does not bundle the CLI binary — it shells out to it.
+claude-agent-sdk>=0.2.122

@@ -18,10 +18,12 @@ Your very first question is: **"What should we call this agent?"** → a short k
 
 ## Pick the framework (runtime)
 Ask right after the name: **which runtime should this run on?**
-- **`headless`** — **built.** Runs as a `claude -p` command; the tier where the charter is
-  really enforced. Recommended / default.
-- **`claude-sdk`, `openai-agents`, `langchain`** — **planned, not yet buildable.** If chosen,
-  say so honestly and offer `headless` instead.
+- **`headless`** — **built.** Runs as a `claude -p` command; the enforcement tier. Recommended
+  / default. → hands off to **create-headless-agent**.
+- **`claude-sdk`** — **built.** The Claude Agent SDK (Claude Code as a Python library); ships a
+  single self-contained, directly runnable `agent.py`. → hands off to **create-claude-sdk-agent**.
+- **`openai-agents`, `langchain`** — **planned, not yet buildable.** If chosen, say so honestly
+  and offer `headless` or `claude-sdk` instead.
 
 To add a framework later: add a `create-<runtime>-agent` skill and one row to this menu —
 nothing else in this interview changes.
@@ -115,7 +117,8 @@ plugins:
   skills: []                  # skill names
 ```
 
-Now invoke the `create-<runtime>-agent` skill (for `headless`: **`create-headless-agent`**) to
-build it. Its instructions stack on top of these; it will write `agents/<id>/brief.yaml`,
-re-confirm the concretized safety values (exact model id, exact tool names, exact hosts),
-generate the project, validate it, and show the honest dry-run report.
+Now invoke the `create-<runtime>-agent` skill (for `headless`: **`create-headless-agent`**; for
+`claude-sdk`: **`create-claude-sdk-agent`**) to build it. Its instructions stack on top of
+these; it will write `agents/<id>/brief.yaml`, re-confirm the concretized safety values (exact
+model id, exact tool names, exact hosts), generate the project, validate it, and show the
+honest dry-run report.

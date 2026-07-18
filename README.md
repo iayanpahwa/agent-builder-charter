@@ -128,9 +128,9 @@ cd agent-builder-charter   # or wherever you cloned it
 
 2. Tell Claude Code what you want: *"help me build a release-notes summarizer agent."* The
    framework-neutral **new-agent** interview runs: it asks the name first, then which runtime
-   to build for (`headless` is built; the others are planned), then plain questions (it never
-   silently decides your model, budget, capabilities, or network), and offers a plug-in round
-   (extra `.md` files, MCP servers, skills).
+   to build for (`headless` and `claude-sdk` are built; the others are planned), then plain
+   questions (it never silently decides your model, budget, capabilities, or network), and
+   offers a plug-in round (extra `.md` files, MCP servers, skills).
 3. It captures a **brief** (the neutral chart of your answers) and hands off to the runtime's
    generator — for headless, **create-headless-agent** — which re-confirms the concretized
    safety values (exact model id, tool names, egress hosts), writes a self-contained project at
@@ -181,6 +181,14 @@ Use the `cron` trigger label so scheduled runs are easy to spot in the log. The 
 works under launchd, a systemd timer, a CI cron, or any orchestrator; they all just call
 `run.sh`.
 
+**`claude-sdk` agents run the same way, minus the wrapper.** There the artifact is a single
+`agent.py` (the charter is embedded in it), so you run it directly — `./agents/<id>/agent.py
+manual`, or `python3 agents/<id>/agent.py cron` from a scheduler — with the same trigger-label
+and `runs.jsonl` convention. It also takes `--stream` (echo the loop live) and `--trace` (write a
+per-run tool-call trace). Two scheduler notes specific to the SDK: the job needs the agent's auth
+env var (`ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN`) and the `claude` CLI on its `PATH`.
+See [`builders/claude-sdk/GUIDE.md`](builders/claude-sdk/GUIDE.md).
+
 ## How it works: the spine
 
 1. **The file is the gate.** One `charter.yaml` per agent; the loader hands it a model, tools,
@@ -196,12 +204,13 @@ works under launchd, a systemd timer, a CI cron, or any orchestrator; they all j
 
 ```
 agent-builder-charter/
-├── .claude/skills/     the build skills: new-agent (neutral interview) · create-headless-agent (generator)
+├── .claude/skills/     the build skills: new-agent (neutral interview) · create-headless-agent
+│                       (headless generator) · create-claude-sdk-agent (SDK generator)
 ├── framework/          the one-page doctrine (why), CC BY 4.0
 ├── core/               the shared, runtime-neutral engine (schema · validator · loader · eval checks · demos)
 └── builders/           each turns a charter into a runnable, enforced agent for one runtime
     ├── claude-headless/   built: runs the agent via `claude -p`; holds the runner + the run-evals skill
-    ├── claude-sdk/        planned: Claude Agent SDK
+    ├── claude-sdk/        built: Claude Agent SDK (Claude Code as a library); ships a single runnable agent.py
     ├── openai-agents/     planned: OpenAI Agents SDK
     └── langchain/         planned: LangChain agents
 ```
@@ -211,7 +220,7 @@ agent-builder-charter/
 | | Enforced walls | Status |
 |---|---|---|
 | **claude-headless** | model · tools (dangerous tools denied) · steps (`--max-turns`) · wall-clock timeout · network egress (hook) · env-scoped credentials · log redaction · retention pruning · eval gate · run log | shipped (v0.2) |
-| **claude-sdk** | same charter, programmatic harness | next |
+| **claude-sdk** | model · tools (dangerous denied) · steps (max_turns) · wall-clock · egress (PreToolUse hook) · env-scoped auth (api-key or subscription) · log redaction · retention · eval gate · run log | shipped (v0.2) |
 | **openai-agents** / **langchain** | same charter, translated per SDK | as needed |
 
 **Honest limits (true for every runtime):** a dollar cap may be a no-op under subscription

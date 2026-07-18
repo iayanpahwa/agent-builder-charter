@@ -5,7 +5,8 @@ enforced, runnable agent for its target, and prints an honest report of what tha
 can and can't enforce.
 
 - `claude-headless/`: built. Agents run as `claude -p` commands (the highest-fidelity option today).
-- `claude-sdk/`: planned (Claude Agent SDK; programmatic, same harness).
+- `claude-sdk/`: built. Ships a single self-contained, runnable `agent.py` on the Claude Agent
+  SDK (Claude Code as a library).
 - `openai-agents/`: planned (OpenAI Agents SDK).
 - `langchain/`: planned (LangChain / LangGraph deep agents).
 
