@@ -63,7 +63,12 @@ def log_run(charter_dir, entry):
 
 def save_output(charter_dir, text):
     ts = datetime.now().strftime("%Y%m%dT%H%M%S")
-    p = os.path.join(_logdir(charter_dir), f"{ts}.output.txt")
+    d = _logdir(charter_dir)
+    p = os.path.join(d, f"{ts}.output.txt")
+    n = 1
+    while os.path.exists(p):  # two runs in the same second must not clobber each other
+        p = os.path.join(d, f"{ts}.{n}.output.txt")
+        n += 1
     with open(p, "w") as f:
         f.write(text)
     return p
