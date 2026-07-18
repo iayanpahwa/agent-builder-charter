@@ -46,10 +46,10 @@ class Registry:
         return aid
 
     def load_dir(self, root):
-        """Register every *charter.yaml found under a directory tree."""
+        """Register every charter.yaml (or *.charter.yaml) found under a directory tree."""
         for dirpath, _dirs, files in os.walk(root):
             for name in files:
-                if name.endswith("charter.yaml"):
+                if name == "charter.yaml" or name.endswith(".charter.yaml"):
                     path = os.path.join(dirpath, name)
                     self.register(load_charter(path), source=path)
 

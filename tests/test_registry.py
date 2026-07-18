@@ -117,3 +117,24 @@ def test_registry_usable_after_rejected_duplicate(good_charter):
     reg.register(charter_b)
 
     assert len(reg.all()) == 2
+
+
+# --- 7. load_dir matches only charter.yaml / *.charter.yaml, not lookalikes --
+
+
+def test_load_dir_matches_only_valid_charter_filenames(tmp_path, good_charter):
+    exact = _distinct(good_charter, "agent-exact")
+    suffixed = _distinct(good_charter, "agent-suffixed")
+    imposter = _distinct(good_charter, "agent-imposter")
+
+    (tmp_path / "charter.yaml").write_text(yaml.safe_dump(exact))
+    (tmp_path / "price-watch-scraper.charter.yaml").write_text(yaml.safe_dump(suffixed))
+    (tmp_path / "notacharter.yaml").write_text(yaml.safe_dump(imposter))
+
+    reg = Registry()
+    reg.load_dir(str(tmp_path))
+
+    ids = {r["charter"]["id"] for r in reg.all()}
+    assert "agent-exact" in ids        # exact "charter.yaml" is registered
+    assert "agent-suffixed" in ids     # "<name>.charter.yaml" is registered
+    assert "agent-imposter" not in ids  # "notacharter.yaml" is NOT registered
