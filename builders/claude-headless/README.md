@@ -60,8 +60,14 @@ shared, reused by every builder (one level up):
 - Real headless walls: `model`, `tools` (plus dangerous tools denied), `budget.steps` (`--max-turns`),
   the wall-clock timeout, and `egress` (via the `--settings` hook when a specific list is set).
 - `tools: []` is valid: a text-only agent is the safest kind.
-- Honest limits: `--max-budget-usd` may be a no-op under subscription auth; a real fs/net sandbox
-  and true credential isolation need a container.
+- **Isolation (known limitation — not yet enforced):** headless scopes the *environment* (Claude
+  auth + declared `env:` creds; all other host secrets dropped) but does **not** jail the
+  filesystem or network. The process runs as your user — it can read any file you can (`~/.aws`,
+  dotfiles, the config dir), and `Bash`/MCP reach the network *outside* the egress hook (which
+  gates only `WebFetch`/`WebSearch`). A real fs/net jail needs a container, not a flag —
+  `--max-budget-usd` may likewise be a no-op under subscription auth. **Planned:** an optional
+  container profile (Podman/Docker — identical on Linux and macOS) mounting only the agent dir
+  plus read-only Claude auth, with network policy at the container edge.
 - Credentials: the runner scopes the subprocess env to Claude's auth + OS essentials + the
   charter's declared `env:` refs; all other host secrets are dropped. Filesystem isolation
   (file-stored secrets) still needs a container.

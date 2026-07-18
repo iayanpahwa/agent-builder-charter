@@ -208,8 +208,10 @@ agent-builder-charter/
 
 **Honest limits (true for every runtime):** a dollar cap may be a no-op under subscription
 auth; a real filesystem/network sandbox and true credential isolation need a container, not a
-flag. The `--dry-run` report tells you the truth per field: `block`, `declared`, or `none` (and
-`—` for a field you didn't set). We never claim a control that nothing enforces.
+flag — and `Bash`/MCP reach the network *outside* the egress hook (which gates only
+`WebFetch`/`WebSearch`). The `--dry-run` report tells you the truth per field: `block`,
+`declared`, or `none` (and `—` for a field you didn't set). We never claim a control that
+nothing enforces.
 
 ## License & how to credit
 
