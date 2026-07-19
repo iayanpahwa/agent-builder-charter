@@ -128,9 +128,9 @@ cd agent-builder-charter   # or wherever you cloned it
 
 2. Tell Claude Code what you want: *"help me build a release-notes summarizer agent."* The
    framework-neutral **new-agent** interview runs: it asks the name first, then which runtime
-   to build for (`headless` and `claude-sdk` are built; the others are planned), then plain
-   questions (it never silently decides your model, budget, capabilities, or network), and
-   offers a plug-in round (extra `.md` files, MCP servers, skills).
+   to build for (`headless`, `claude-sdk`, and `langchain` are built; `openai-agents` is
+   planned), then plain questions (it never silently decides your model, budget, capabilities,
+   or network), and offers a plug-in round (extra `.md` files, MCP servers, skills).
 3. It captures a **brief** (the neutral chart of your answers) and hands off to the runtime's
    generator — for headless, **create-headless-agent** — which re-confirms the concretized
    safety values (exact model id, tool names, egress hosts), writes a self-contained project at
@@ -148,6 +148,36 @@ python3 builders/claude-headless/run_headless.py \
 
 Prefer to see the ideas first? `python3 core/loader.py` (per-run enforcement) and
 `python3 core/registry.py` (the fleet board / off-switch) are runnable concept demos.
+
+## Build for the SDK or LangChain runtime
+
+The interview is identical; pick a different runtime and you get a different artifact. Both the
+`claude-sdk` and `langchain` runtimes ship a single self-contained `agent.py` with the charter
+embedded (no `run.sh` wrapper), so you run the file directly.
+
+**`claude-sdk`** — the Claude Agent SDK (Claude Code as a library). Project lands at
+`builders/claude-sdk/agents/<id>/`:
+
+```bash
+python3 builders/claude-sdk/agents/<id>/agent.py --dry-run     # what's REALLY enforced, no tokens
+pip install -r builders/claude-sdk/agents/<id>/requirements.txt   # + the `claude` CLI on PATH, authed
+./builders/claude-sdk/agents/<id>/agent.py manual
+```
+
+**`langchain`** — the LangGraph minimal harness (`create_agent`). Project lands at
+`builders/langchain/agents/<id>/`:
+
+```bash
+pip install -r builders/langchain/agents/<id>/requirements.txt    # langgraph + langchain + langchain-anthropic
+export ANTHROPIC_API_KEY=sk-...
+python3 builders/langchain/agents/<id>/agent.py --dry-run
+./builders/langchain/agents/<id>/agent.py manual
+```
+
+The langchain agent's tools come from a vetted, guarded catalog: `fetch_url` (host-checked
+against `egress`) plus path-jailed `read_file` / `list_dir` / `grep` / `write_file` (confined to
+`sandbox.filesystem`). The generator binds only the tools the charter grants; there is no `bash`
+(an arbitrary shell would defeat every wall).
 
 ## Running an agent
 
@@ -189,6 +219,14 @@ per-run tool-call trace). Two scheduler notes specific to the SDK: the job needs
 env var (`ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN`) and the `claude` CLI on its `PATH`.
 See [`builders/claude-sdk/GUIDE.md`](builders/claude-sdk/GUIDE.md).
 
+**`langchain` agents run the same single-file way.** The artifact is an `agent.py` on the
+LangGraph minimal harness with the charter embedded; run it directly (`./agents/<id>/agent.py
+manual`) or `python3 agents/<id>/agent.py cron`, same trigger-label and `runs.jsonl` convention.
+Its scheduler notes: the job needs `ANTHROPIC_API_KEY` and the langchain deps installed (no
+`claude` CLI required). Tools come from a guarded catalog (`fetch_url` plus path-jailed
+`read_file` / `list_dir` / `grep` / `write_file`). See
+[`builders/langchain/GUIDE.md`](builders/langchain/GUIDE.md).
+
 ## How it works: the spine
 
 1. **The file is the gate.** One `charter.yaml` per agent; the loader hands it a model, tools,
@@ -205,14 +243,14 @@ See [`builders/claude-sdk/GUIDE.md`](builders/claude-sdk/GUIDE.md).
 ```
 agent-builder-charter/
 ├── .claude/skills/     the build skills: new-agent (neutral interview) · create-headless-agent
-│                       (headless generator) · create-claude-sdk-agent (SDK generator)
+│                       (headless gen) · create-claude-sdk-agent (SDK gen) · create-langchain-agent (LangChain gen)
 ├── framework/          the one-page doctrine (why), CC BY 4.0
 ├── core/               the shared, runtime-neutral engine (schema · validator · loader · eval checks · demos)
 └── builders/           each turns a charter into a runnable, enforced agent for one runtime
     ├── claude-headless/   built: runs the agent via `claude -p`; holds the runner + the run-evals skill
     ├── claude-sdk/        built: Claude Agent SDK (Claude Code as a library); ships a single runnable agent.py
-    ├── openai-agents/     planned: OpenAI Agents SDK
-    └── langchain/         planned: LangChain agents
+    ├── langchain/         built: LangGraph minimal harness; single runnable agent.py + a guarded tool catalog
+    └── openai-agents/     planned: OpenAI Agents SDK
 ```
 
 ## What's shipped vs. coming
@@ -221,14 +259,17 @@ agent-builder-charter/
 |---|---|---|
 | **claude-headless** | model · tools (dangerous tools denied) · steps (`--max-turns`) · wall-clock timeout · network egress (hook) · env-scoped credentials · log redaction · retention pruning · eval gate · run log | shipped (v0.2) |
 | **claude-sdk** | model · tools (dangerous denied) · steps (max_turns) · wall-clock · egress (PreToolUse hook) · env-scoped auth (api-key or subscription) · log redaction · retention · eval gate · run log | shipped (v0.2) |
-| **openai-agents** / **langchain** | same charter, translated per SDK | as needed |
+| **langchain** | model · tools (only bound tools exist) · steps (recursion_limit) · wall-clock · egress (in `fetch_url`) · filesystem jail (in the fs tools) · env-scoped credentials · log redaction · retention · eval gate · run log | shipped (v0.2) |
+| **openai-agents** | same charter, translated per SDK | planned |
 
 **Honest limits (true for every runtime):** a dollar cap may be a no-op under subscription
-auth; a real filesystem/network sandbox and true credential isolation need a container, not a
-flag — and `Bash`/MCP reach the network *outside* the egress hook (which gates only
-`WebFetch`/`WebSearch`). The `--dry-run` report tells you the truth per field: `block`,
-`declared`, or `none` (and `—` for a field you didn't set). We never claim a control that
-nothing enforces.
+auth (and on `langchain` it's a soft post-hoc estimate, since LangGraph has no native spend
+cap); a real filesystem/network sandbox and true credential isolation need a container, not a
+flag. On the Claude runtimes, `Bash`/MCP reach the network *outside* the egress hook (which
+gates only `WebFetch`/`WebSearch`); on `langchain`, only the tools the builder generates are
+egress- and filesystem-checked, so a third-party LangChain tool would reach out around those
+guards. The `--dry-run` report tells you the truth per field: `block`, `declared`, or `none`
+(and `—` for a field you didn't set). We never claim a control that nothing enforces.
 
 ## License & how to credit
 
