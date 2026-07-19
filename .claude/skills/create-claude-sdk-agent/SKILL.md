@@ -139,6 +139,11 @@ builders/claude-sdk/agents/<id>/
 
 Generate `agent.py` in the exact shape of `builders/claude-sdk/example.agent.py` — study that
 file directly, it is the reference artifact:
+- the module header docstring, rewritten for THIS agent: the first line reads `<id> — a
+  CHARTER-governed agent ...`, and the `Run:` line references `agent.py` (this agent's filename),
+  NOT `example.agent.py`. Rewrite every `example.agent.py` occurrence in the header to `agent.py`,
+  and set the `argparse` description to `<id>`. Leave no `example.agent.py` or the reference name
+  behind.
 - embedded `CHARTER` dict, `DANGEROUS` list
 - the pure helpers: `auth_mode`, `scoped_env` (with the auth-mode cross-shadow guard + `~`
   expansion), `egress_decision` + `_host_allowed`, `redact`, `observability` + `trace_line`,
