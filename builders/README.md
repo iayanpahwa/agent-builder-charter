@@ -7,8 +7,9 @@ can and can't enforce.
 - `claude-headless/`: built. Agents run as `claude -p` commands (the highest-fidelity option today).
 - `claude-sdk/`: built. Ships a single self-contained, runnable `agent.py` on the Claude Agent
   SDK (Claude Code as a library).
+- `langchain/`: built. Ships a single self-contained, runnable `agent.py` on the LangGraph minimal
+  harness (`create_react_agent`); Deep Agents is an opt-in, not the default.
 - `openai-agents/`: planned (OpenAI Agents SDK).
-- `langchain/`: planned (LangChain / LangGraph deep agents).
 
 The shared, runtime-neutral pieces (schema, validators, eval checks) live in `../core/` and
 the doctrine in `../framework/`. Builders reuse them; they don't duplicate them.

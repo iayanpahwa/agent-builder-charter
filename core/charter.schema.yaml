@@ -45,7 +45,8 @@ properties:
     description: >
       Which harness this agent is built for. Decides the vocabulary of `tools`
       (e.g. claude-code uses WebSearch/WebFetch/Read; a standalone runtime uses your
-      own verbs like fetch_url). Well-known values: claude-code, standalone, headless.
+      own verbs like fetch_url). Well-known values: claude-code, standalone, headless,
+      claude-sdk, langchain.
       Other values are allowed; a builder that does not recognize one treats it as
       standalone. Optional, but the new-agent skill always sets it.
     x-enforced: declared
