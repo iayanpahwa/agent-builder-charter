@@ -1,0 +1,46 @@
+# A CHARTER-governed LangChain / LangGraph agent (the embedded charter of ../example.agent.py,
+# written out for `python3 core/validate.py` and as a regeneration source). Generated, never
+# hand-edited: re-run the new-agent interview or the create-langchain-agent generator to change it.
+charter: "0.2"
+runtime: langchain
+id: langchain-docs-researcher
+version: "1"
+owner:
+  team: demo
+  on_call: "@owner"
+  escalation: owner@example.com
+status: enabled
+context:
+  trusted_sources:
+    - prompts/system.md
+model:
+  provider: anthropic
+  id: claude-haiku-4-5
+sandbox:
+  isolation: none
+  persist_state: false
+budget:
+  usd: 0.20
+  steps: 8
+  wall_clock_seconds: 90
+tools:
+  - fetch_url
+credentials:
+  - name: api-auth
+    ref: env:ANTHROPIC_API_KEY
+    scope: anthropic api
+egress:
+  - docs.python.org
+approval_tier:
+  auto:
+    - fetch_url
+  human_approval: []
+data:
+  class: public
+  retention_days: 7
+  redact: []
+evals:
+  suite: evals/cases.yaml
+  success_metric:
+    name: cites a docs.python.org URL
+    slo: "100%"

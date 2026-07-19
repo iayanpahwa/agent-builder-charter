@@ -14,6 +14,7 @@ builders/claude-headless/.claude/settings.json
 builders/claude-headless/.claude/settings.local.json
 builders/*/agents/*/logs/
 builders/claude-sdk/logs/
+builders/langchain/logs/
 
 # Stray "~" dirs the harness creates by writing session logs to a relative "~"
 # (at the repo root or under a builder). Not project content. Do NOT delete by

@@ -1,0 +1,9 @@
+success_metric: "cites a docs.python.org URL"
+slo: "100%"
+cases:
+  - id: cites-a-source
+    input: "What does str.removeprefix() do, and since which version?"
+    invariants:
+      - contains_url: true
+      - claims_cited: [removeprefix, "3.9", version, returns, string]
+    human_check: "click the cited docs.python.org page; confirm the version and behavior are real"

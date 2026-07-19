@@ -1,0 +1,9 @@
+# LangChain / LangGraph minimal harness. The generator pins these against the LIVE docs before
+# shipping — these APIs drift (create_react_agent location, LangChain 1.0 create_agent,
+# init_chat_model, recursion_limit semantics). Floors below are conservative and include
+# langgraph.prebuilt.create_react_agent + langchain.chat_models.init_chat_model.
+langgraph>=0.2
+langchain>=0.3
+langchain-anthropic>=0.3
+# fetch_url uses stdlib urllib (no extra HTTP dep). PyYAML is pulled in transitively by langchain
+# and is used to read evals/cases.yaml.
