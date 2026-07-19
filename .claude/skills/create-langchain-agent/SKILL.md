@@ -166,6 +166,11 @@ builders/langchain/agents/<id>/
 
 Generate `agent.py` in the exact shape of `builders/langchain/example.agent.py` — study that file
 directly, it is the reference artifact:
+- the module header docstring, rewritten for THIS agent: the first line reads `<id> — a
+  CHARTER-governed agent ...`, and the `Run:` line references `agent.py` (this agent's filename),
+  NOT `example.agent.py`. Rewrite every `example.agent.py` occurrence in the header to `agent.py`,
+  and set the `argparse` description to `<id>`. Leave no `example.agent.py` or the reference name
+  behind.
 - embedded `CHARTER` dict, the `_PRICE_PER_MTOK` table
 - the pure helpers: `scoped_env`, `_host_allowed` + `fetch_egress_check`, `resolve_root` +
   `jail_path` (the fs wall), `estimate_cost`, `redact`, the inlined eval_checks (`check_one`/
