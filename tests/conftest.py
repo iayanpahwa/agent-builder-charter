@@ -18,13 +18,27 @@ if str(CORE_DIR) not in sys.path:
     sys.path.insert(0, str(CORE_DIR))
 
 SENTIMENT_TAGGER_CHARTER = (
-    REPO_ROOT / "builders" / "claude-headless" / "agents" / "sentiment-tagger" / "charter.yaml"
+    REPO_ROOT
+    / "builders"
+    / "claude-headless"
+    / "agents"
+    / "sentiment-tagger"
+    / "charter.yaml"
 )
 
-# The 3 charters shipped in the repo today; every one of them must validate.
+# The charters shipped in the repo today; every one of them must validate.
 SHIPPED_CHARTERS = [
     REPO_ROOT / "core" / "examples" / "price-watch-scraper.charter.yaml",
-    REPO_ROOT / "builders" / "claude-headless" / "examples" / "repo-researcher.charter.yaml",
+    REPO_ROOT
+    / "builders"
+    / "claude-headless"
+    / "examples"
+    / "repo-researcher.charter.yaml",
+    REPO_ROOT
+    / "builders"
+    / "langchain"
+    / "examples"
+    / "langchain-docs-researcher.charter.yaml",
     SENTIMENT_TAGGER_CHARTER,
 ]
 
