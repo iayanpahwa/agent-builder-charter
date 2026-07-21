@@ -17,6 +17,8 @@ import importlib.util
 import os
 import subprocess
 import sys
+import urllib.error as urllib_error
+import urllib.request as urllib_request
 
 import pytest
 import yaml
@@ -103,6 +105,68 @@ def test_egress_none_closes():
 def test_egress_no_host_denied():
     allow, _ = agent.fetch_egress_check("not-a-url", ["docs.python.org"])
     assert not allow
+
+
+# --- scheme wall: only http/https may be fetched (blocks file://, ftp://, SSRF-via-scheme) ----
+
+
+@pytest.mark.parametrize(
+    "url,ok",
+    [
+        ("https://docs.python.org/3/", True),
+        ("http://docs.python.org/3/", True),
+        ("HTTPS://docs.python.org/3/", True),  # scheme is case-insensitive
+        ("file:///etc/passwd", False),
+        ("ftp://docs.python.org/x", False),
+        ("gopher://docs.python.org/", False),
+    ],
+)
+def test_scheme_allowed(url, ok):
+    assert agent.scheme_allowed(url) is ok
+
+
+def test_fetch_url_refuses_file_scheme_even_when_egress_open():
+    # #2: egress:[any] host-checks nothing, so without a scheme wall a file:// URL would read a
+    # local file. The scheme check must refuse it before any open() happens — no network, no fs read.
+    pytest.importorskip("langchain_core")
+    f = agent.make_fetch_url(["any"])
+    msg = f.invoke({"url": "file:///etc/passwd"})
+    assert "[egress denied]" in msg
+    assert "http/https" in msg
+
+
+# --- redirect wall: every redirect hop is re-checked against egress (#1) ----------------------
+
+
+def _redirect(handler, newurl, code=302):
+    """Drive the handler's redirect_request the way urllib does mid-fetch. Returns the new Request
+    on allow, or raises urllib.error.HTTPError on a denied hop."""
+    import http.client
+
+    req = urllib_request.Request("https://docs.python.org/3/")
+    return handler.redirect_request(
+        req, None, code, "Found", http.client.HTTPMessage(), newurl
+    )
+
+
+def test_redirect_to_offlist_host_is_refused():
+    # #1: an allowed host that 302-redirects to another host must NOT be followed.
+    handler = agent._EgressRedirectHandler(["docs.python.org"])
+    with pytest.raises(urllib_error.HTTPError):
+        _redirect(handler, "https://evil.example.com/steal")
+
+
+def test_redirect_to_nonhttp_scheme_is_refused():
+    handler = agent._EgressRedirectHandler(["docs.python.org"])
+    with pytest.raises(urllib_error.HTTPError):
+        _redirect(handler, "file:///etc/passwd")
+
+
+def test_redirect_to_onlist_host_is_allowed():
+    # an on-list (or subdomain) redirect target is still followed — the wall only stops escapes.
+    handler = agent._EgressRedirectHandler(["docs.python.org"])
+    new_req = _redirect(handler, "https://docs.python.org/3/whatsnew/")
+    assert new_req.get_full_url() == "https://docs.python.org/3/whatsnew/"
 
 
 # --- estimate_cost: the soft, client-side budget.usd number ------------------

@@ -12,8 +12,9 @@ Real walls this runner enforces (see enforcement_report() / --dry-run for the ho
   model                 init_chat_model('<provider>:<id>') pins the exact model. Real.
   tools                 only the bound tools exist — LangGraph has NO ambient tool registry, so nothing
                         else is callable. No disallowed-list is needed; the wall is "nothing else bound".
-  egress                enforced INSIDE the fetch_url tool: it host-checks every URL against the charter's
-                        egress list BEFORE requesting, and refuses otherwise. A cleaner wall than a hook —
+  egress                enforced INSIDE the fetch_url tool: http/https only, and it host-checks every URL —
+                        including each redirect hop — against the charter's egress list BEFORE that host is
+                        reached, and refuses otherwise. A cleaner wall than a hook —
                         BUT it only covers tools THIS builder generates; a third-party LangChain tool you
                         add reaches the network outside this guard (a container is required to fence it).
   budget.steps          recursion_limit (~2x steps for a ReAct loop) hard-stops the graph. Real.
@@ -31,6 +32,7 @@ import os
 import re
 import sys
 import time
+import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 from urllib.parse import urlparse
@@ -123,6 +125,45 @@ def _host_allowed(host, egress):
         if host == pattern or host == bare or host.endswith("." + bare):
             return True
     return False
+
+
+_ALLOWED_SCHEMES = ("http", "https")
+
+
+def scheme_allowed(url):
+    """Only http/https URLs may be fetched. Blocks file://, ftp://, gopher://, etc. — otherwise a
+    `file:///etc/passwd` URL would read a local file, and it would slip past egress:[any] entirely
+    (an [any] policy host-checks nothing). This is a scheme wall independent of the host allow-list.
+    """
+    return urlparse(url).scheme.lower() in _ALLOWED_SCHEMES
+
+
+class _EgressRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Re-applies the scheme + egress check to EVERY redirect hop. urllib follows 301/302/303/307
+    redirects by default, so without this an allowed host that responds with a redirect to another
+    host (or scheme) would let the fetch reach a destination the egress policy never permitted —
+    defeating the whole point of the allow-list. Each hop is re-checked; a denied hop aborts.
+    """
+
+    def __init__(self, egress):
+        super().__init__()
+        self.egress = egress
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not scheme_allowed(newurl):
+            raise urllib.error.HTTPError(
+                newurl,
+                code,
+                f"egress: refusing redirect to non-http(s) URL {newurl!r}",
+                headers,
+                fp,
+            )
+        allow, reason = fetch_egress_check(newurl, self.egress)
+        if not allow:
+            raise urllib.error.HTTPError(
+                newurl, code, f"egress: refusing redirect — {reason}", headers, fp
+            )
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
 def fetch_egress_check(url, egress):
@@ -503,8 +544,8 @@ def enforcement_report(charter):
         granted = "fetch_url" in tools
         how = (
             (
-                "gates fetch_url: it host-checks each URL against the allow-list BEFORE requesting and "
-                "refuses otherwise"
+                "gates fetch_url: http/https only, and it host-checks each URL — including every "
+                "redirect hop — against the allow-list BEFORE that host is reached, refusing otherwise"
             )
             if granted
             else ("no network tool is granted, so egress is a non-issue for this agent")
@@ -632,14 +673,20 @@ def enforcement_report(charter):
 # ============================================================================
 def make_fetch_url(egress):
     """Return an egress-guarded LangChain `fetch_url` tool. THE egress wall for this runtime: it
-    host-checks every URL against `egress` BEFORE any request. Imports langchain lazily, so the
-    module (and --dry-run) never pulls it in."""
+    checks the scheme (http/https only) and host-checks every URL — INCLUDING each redirect hop —
+    against `egress` before any request reaches that host. Imports langchain lazily, so the module
+    (and --dry-run) never pulls it in."""
     from langchain_core.tools import tool
 
     @tool
     def fetch_url(url: str) -> str:
-        """Fetch the visible text of a web page by URL. Only hosts permitted by this agent's egress
-        policy are reachable; any other host is refused."""
+        """Fetch the visible text of a web page by URL. Only http/https URLs whose host is permitted
+        by this agent's egress policy are reachable; any other scheme or host is refused (redirects
+        are re-checked per hop)."""
+        if not scheme_allowed(url):
+            return (
+                f"[egress denied] only http/https URLs may be fetched; refusing {url!r}"
+            )
         allow, reason = fetch_egress_check(url, egress)
         if not allow:
             return f"[egress denied] {reason}"
@@ -647,9 +694,12 @@ def make_fetch_url(egress):
             req = urllib.request.Request(
                 url, headers={"User-Agent": "charter-langchain-agent"}
             )
-            with urllib.request.urlopen(
+            # A custom opener re-runs the scheme + egress check on every redirect hop; the default
+            # opener would follow a redirect to ANY host, bypassing the allow-list.
+            opener = urllib.request.build_opener(_EgressRedirectHandler(egress))
+            with opener.open(
                 req, timeout=20
-            ) as r:  # noqa: S310 - host already egress-checked
+            ) as r:  # noqa: S310 - scheme + host egress-checked, redirects re-checked
                 raw = r.read(300_000)
             return raw.decode("utf-8", "replace")[:20000]
         except Exception as e:  # noqa: BLE001

@@ -221,6 +221,12 @@ properties:
       use `none` as the sole entry (`egress: [none]`); the runtime blocks every network
       call, and like `any`, `none` must be the only entry. A bare `*` entry is not
       allowed (use `any`); subdomain patterns like `*.example.com` are fine.
+      Host matching is subdomain-inclusive: a bare entry `example.com` matches both
+      `example.com` AND any subdomain (`api.example.com`), so `*.example.com` is
+      equivalent to `example.com` — the `*.` prefix is accepted for readability, not a
+      narrower match. Consequence to weigh: listing a shared-suffix host (e.g.
+      `github.io`, `s3.amazonaws.com`) authorizes every subdomain under it, including
+      ones an attacker may control — list the most specific host that does the job.
     x-enforced: block
     x-runtime: >
       The egress hook gates the web tools (WebFetch, WebSearch): WebFetch is allowed only to
