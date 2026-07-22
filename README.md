@@ -2,6 +2,8 @@
 
 **A permission slip your AI agents actually can't exceed.**
 
+Read the complete blog : [https://codensolder.com/posts/from-iot-fleets-to-agent-fleets](https://codensolder.com/posts/from-iot-fleets-to-agent-fleets)
+
 Every agent ships with one small file, its charter, that lists the only things it is
 allowed to do: which model, which tools, how much it may spend, which sites it may reach,
 which secrets it holds, and who owns it. A loader reads that file and is the *only door*: **if
