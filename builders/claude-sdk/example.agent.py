@@ -81,8 +81,9 @@ _ESSENTIAL_PREFIXES = ("LC_", "CLAUDE_")
 
 
 def auth_mode(charter):
-    """"api-key" | "subscription" | "none", read off the declared auth credential's ref.
-    Drives scoped_env's cross-shadowing guard and the --dry-run billing note."""
+    """Which auth the charter declares: "api-key", "subscription", or "none", read off the
+    declared auth credential's ref. Drives scoped_env's cross-shadowing guard and the
+    --dry-run billing note."""
     for cred in charter.get("credentials") or []:
         ref = cred.get("ref", "")
         if ref == "env:ANTHROPIC_API_KEY":
