@@ -11,16 +11,14 @@ Covers three surfaces:
      let a trailing-dot host slip through) is closed.
 """
 
-import copy
 import sys
 
 import pytest
-
 from conftest import REPO_ROOT
 
 sys.path.insert(0, str(REPO_ROOT / "builders" / "claude-headless"))
-from loader import validate, CharterInvalid
 from egress_guard import host_allowed
+from loader import CharterInvalid, validate
 
 # --- 1. Egress: malformed entries are rejected -----------------------------
 

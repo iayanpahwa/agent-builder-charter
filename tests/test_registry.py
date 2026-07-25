@@ -9,7 +9,6 @@ import copy
 
 import pytest
 import yaml
-
 from registry import DuplicateAgentId, Registry
 
 

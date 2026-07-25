@@ -22,7 +22,7 @@ import time
 from conftest import REPO_ROOT
 
 sys.path.insert(0, str(REPO_ROOT / "builders" / "claude-headless"))
-from run_headless import _redact, _declared_secret_values, prune_logs, _logdir  # noqa: E402
+from run_headless import _declared_secret_values, _logdir, _redact, prune_logs
 
 # --- _redact -----------------------------------------------------------------
 

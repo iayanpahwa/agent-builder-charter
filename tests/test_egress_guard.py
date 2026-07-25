@@ -10,9 +10,8 @@ import os
 import subprocess
 import sys
 
-import yaml
 import pytest
-
+import yaml
 from conftest import REPO_ROOT
 
 EGRESS_GUARD = REPO_ROOT / "builders" / "claude-headless" / "egress_guard.py"

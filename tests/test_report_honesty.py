@@ -16,7 +16,7 @@ import sys
 from conftest import REPO_ROOT
 
 sys.path.insert(0, str(REPO_ROOT / "builders" / "claude-headless"))
-from run_headless import report  # noqa: E402
+from run_headless import report
 
 REQUIRED_FIELDS = [
     "status",

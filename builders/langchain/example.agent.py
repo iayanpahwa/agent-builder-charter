@@ -438,7 +438,7 @@ def _prune_logs(retention_days):
                     ts = entry.get("timestamp")
                     if ts and datetime.fromisoformat(ts).timestamp() < cutoff:
                         continue  # too old — drop
-                except Exception:  # noqa: BLE001
+                except Exception:  # noqa: BLE001,S110 - a bad line must not lose the rest
                     pass  # keep unparseable lines rather than lose data
                 kept.append(line)
         with open(runs, "w") as f:
@@ -744,13 +744,15 @@ def make_fetch_url(egress):
         if not allow:
             return f"[egress denied] {reason}"
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "charter-langchain-agent"})
-            # A custom opener re-runs the scheme + egress check on every redirect hop; the default
-            # opener would follow a redirect to ANY host, bypassing the allow-list.
+            # The noqa sits on Request(): that is where the URL enters urllib, and so where
+            # the scheme audit fires. url is already scheme- and host-checked above, and the
+            # custom opener re-runs both on every redirect hop — the default opener would
+            # follow a redirect to ANY host, bypassing the allow-list.
+            req = urllib.request.Request(  # noqa: S310 - egress-checked above, redirects too
+                url, headers={"User-Agent": "charter-langchain-agent"}
+            )
             opener = urllib.request.build_opener(_EgressRedirectHandler(egress))
-            with opener.open(
-                req, timeout=20
-            ) as r:  # noqa: S310 - scheme + host egress-checked, redirects re-checked
+            with opener.open(req, timeout=20) as r:
                 raw = r.read(300_000)
             return raw.decode("utf-8", "replace")[:20000]
         except Exception as e:  # noqa: BLE001

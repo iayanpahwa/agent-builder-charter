@@ -20,8 +20,8 @@ from datetime import datetime
 from conftest import REPO_ROOT
 
 sys.path.insert(0, str(REPO_ROOT / "builders" / "claude-headless"))
-import run_headless  # noqa: E402
-from run_headless import save_output  # noqa: E402
+import run_headless
+from run_headless import save_output
 
 
 class _FrozenDatetime:

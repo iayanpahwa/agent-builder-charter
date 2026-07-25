@@ -22,7 +22,7 @@ import sys
 from conftest import REPO_ROOT
 
 sys.path.insert(0, str(REPO_ROOT / "builders" / "claude-headless"))
-from run_headless import _settings_file  # noqa: E402
+from run_headless import _settings_file
 
 EGRESS_GUARD = REPO_ROOT / "builders" / "claude-headless" / "egress_guard.py"
 

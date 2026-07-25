@@ -6,14 +6,12 @@ fail-closed basics. No model calls, no network, no subprocess execution of
 agents themselves.
 """
 
-import copy
 import os
 import subprocess
 import sys
 
 import pytest
 import yaml
-
 from conftest import REPO_ROOT, SHIPPED_CHARTERS
 from loader import CharterInvalid, load_charter, validate
 

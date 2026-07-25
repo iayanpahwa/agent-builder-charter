@@ -3,9 +3,15 @@
 # [project] table: adding one would imply `pip install`-ability that isn't the point here.
 #
 # line-length is 100, not black's default 88, because that is the width this codebase was
-# already written to. Both formatters below discover this file automatically, so an editor
-# hook or a bare `black .` now agrees with the repo instead of imposing 88 and reflowing
-# hundreds of lines on every touch.
+# already written to. black discovers this file automatically, so an editor hook or a bare
+# `black .` now agrees with the repo instead of imposing 88 and reflowing hundreds of lines
+# on every touch.
+#
+# Division of labour: black formats, ruff lints. Do NOT run `ruff format` — ruff's formatter
+# is black-compatible but not identical, and the two disagree on ~5 files here over whether
+# to split a line whose overflow comes from a trailing `# noqa` comment. Running both just
+# trades one diff for the other forever. (Switching wholesale to `ruff format` is a fine
+# future call; it means reformatting once and pointing editor hooks at ruff.)
 
 [tool.black]
 line-length = 100
@@ -31,12 +37,16 @@ select = [
     "RUF",  # ruff-specific, incl. RUF100 unused-noqa
 ]
 
+# E501 is off because black owns line width. Left on, it fires only where the formatter
+# cannot help — inside a long string, a URL, or a trailing comment — so it becomes a rule
+# you satisfy by mangling prose. ruff's own docs advise against pairing it with a formatter.
+ignore = ["E501"]
+
+# Everything else is suppressed at the line that needs it, with a reason, rather than by
+# file: `# noqa: S110` on a deliberate swallow documents intent AND leaves the rule live to
+# catch the next silent one. Only genuinely file-wide properties belong below.
 [tool.ruff.lint.per-file-ignores]
-# Tests assert (S101), and several must put a builder dir on sys.path before importing from
-# it (E402) — that import order is the point, not an oversight.
-"tests/*" = ["S101", "E402"]
-# The example agents are reference artifacts that generators transcribe. They exec charter-
-# declared behaviour behind explicit guards, so bandit's subprocess/urllib heuristics fire on
-# code whose safety is the guard, not the call site.
-"builders/*/example.agent.py" = ["S310", "S603", "S607"]
-"builders/claude-headless/run_headless.py" = ["S310", "S603", "S607"]
+# Tests assert (S101), their fixtures carry obviously-fake credentials to prove the real ones
+# get dropped (S105), and they shell out to python3 and the runners to exercise the real
+# entrypoints rather than a mock (S603, S607). All four are what a test here looks like.
+"tests/*" = ["S101", "S105", "S603", "S607"]

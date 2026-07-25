@@ -104,7 +104,7 @@ def load_charter(path):
         with open(path) as f:
             doc = yaml.safe_load(f)
     except FileNotFoundError:
-        raise CharterInvalid(f"no charter at {path}")
+        raise CharterInvalid(f"no charter at {path}") from None
     validate(doc)
     return doc
 

@@ -102,7 +102,7 @@ def _table(reg):
             (c["id"], c["owner"]["team"], c["data"]["class"], c["model"]["id"], rec["status"])
         )
     w = [
-        max(len(str(r[i])) for r in rows + [("id", "team", "data", "model", "status")])
+        max(len(str(r[i])) for r in [*rows, ("id", "team", "data", "model", "status")])
         for i in range(5)
     ]
     head = ("id", "team", "data.class", "model.id", "status")

@@ -15,7 +15,6 @@ import subprocess
 import sys
 
 import yaml
-
 from conftest import REPO_ROOT
 
 AGENT_PATH = REPO_ROOT / "builders" / "claude-sdk" / "example.agent.py"

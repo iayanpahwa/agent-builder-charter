@@ -342,7 +342,7 @@ def _prune_logs(retention_days):
                     ts = entry.get("timestamp")
                     if ts and datetime.fromisoformat(ts).timestamp() < cutoff:
                         continue  # too old — drop
-                except Exception:  # noqa: BLE001
+                except Exception:  # noqa: BLE001,S110 - a bad line must not lose the rest
                     pass  # keep unparseable lines rather than lose data
                 kept.append(line)
         with open(runs, "w") as f:
@@ -746,7 +746,7 @@ async def run(trigger, prompt, stream=None, trace=None):
         assistant_text, result_msg = "", None
         try:
             await gen.aclose()  # cancel cleanly rather than leak the underlying subprocess
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001,S110 - best-effort cleanup on a dying run
             pass
     finally:
         if trace_fp:

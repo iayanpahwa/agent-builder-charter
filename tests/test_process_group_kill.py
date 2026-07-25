@@ -14,14 +14,13 @@ too. No tokens, no network, no `claude` invoked.
 import os
 import signal
 import subprocess
-import time
-
 import sys
+import time
 
 from conftest import REPO_ROOT
 
 sys.path.insert(0, str(REPO_ROOT / "builders" / "claude-headless"))
-from run_headless import _kill_process_group  # noqa: E402
+from run_headless import _kill_process_group
 
 
 def _alive(pid):

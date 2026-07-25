@@ -17,12 +17,11 @@ import copy
 import sys
 
 import yaml
-
 from conftest import REPO_ROOT
 
 sys.path.insert(0, str(REPO_ROOT / "builders" / "claude-headless"))
-from run_headless import report  # noqa: E402
-from loader import validate  # noqa: E402
+from loader import validate
+from run_headless import report
 
 SCHEMA_PATH = REPO_ROOT / "core" / "charter.schema.yaml"
 

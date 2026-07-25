@@ -15,7 +15,7 @@ import sys
 from conftest import REPO_ROOT
 
 sys.path.insert(0, str(REPO_ROOT / "builders" / "claude-headless"))
-from run_headless import scoped_env, _ESSENTIAL_VARS, _ESSENTIAL_PREFIXES  # noqa: E402
+from run_headless import _ESSENTIAL_PREFIXES, _ESSENTIAL_VARS, scoped_env
 
 
 def test_ambient_secret_dropped(monkeypatch):

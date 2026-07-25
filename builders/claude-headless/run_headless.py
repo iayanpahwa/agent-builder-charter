@@ -42,8 +42,8 @@ from datetime import datetime
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "..", "core"))  # shared runtime-neutral engine
-from loader import CharterInvalid, load_charter  # noqa: E402
 import eval_checks  # noqa: E402
+from loader import CharterInvalid, load_charter  # noqa: E402
 
 DANGEROUS = ["Bash", "Write", "Edit", "MultiEdit", "NotebookEdit", "Task"]
 
@@ -142,7 +142,7 @@ def prune_logs(charter_dir, retention_days):
                     ts = entry.get("timestamp")
                     if ts and datetime.fromisoformat(ts).timestamp() < cutoff:
                         continue  # too old — drop
-                except Exception:  # noqa: BLE001
+                except Exception:  # noqa: BLE001,S110 - a bad line must not lose the rest
                     pass  # keep unparseable lines rather than lose data
                 kept.append(line)
         with open(runs, "w") as f:
@@ -558,7 +558,7 @@ def main():
     timeout = (charter.get("budget") or {}).get("wall_clock_seconds", 120)
     t0 = time.time()
     try:
-        proc = subprocess.Popen(
+        proc = subprocess.Popen(  # noqa: S603 - argv list from build_command, never a shell
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,

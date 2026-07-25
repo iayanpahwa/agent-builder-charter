@@ -19,13 +19,12 @@ means open (allow all). The settings block it is wired with:
 
 import argparse
 import json
+import os
 import sys
 from urllib.parse import urlparse
 
-import os
-
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "core"))
-from loader import load_charter  # noqa: E402
+from loader import load_charter
 
 # Claude Code tools that reach the network, and where the URL sits in tool_input.
 NET_TOOLS = {"WebFetch": "url", "WebSearch": None}
