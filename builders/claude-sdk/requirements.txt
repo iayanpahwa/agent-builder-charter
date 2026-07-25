@@ -1,3 +1,6 @@
 # Also needs the `claude` CLI (Node) on PATH, already authenticated. Unlike the
 # TypeScript SDK, the Python SDK does not bundle the CLI binary — it shells out to it.
 claude-agent-sdk>=0.2.122
+# The eval gate reads evals/cases.yaml; unlike the langchain builder nothing pulls PyYAML in
+# transitively here, so it has to be declared.
+PyYAML>=6
