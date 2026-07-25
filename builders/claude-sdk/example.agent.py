@@ -784,9 +784,16 @@ async def run(trigger, prompt, stream=None, trace=None):
     def _on_event(kind, payload):
         """Optional observability — live console echo (stream) and/or per-run trace file. Both
         redacted; neither is a wall (they only observe what the enforced loop already did)."""
-        if kind == "text" and stream:
-            sys.stdout.write(redact(payload, patterns, secret_values))
-            sys.stdout.flush()
+        if kind == "text":
+            safe = redact(payload, patterns, secret_values)
+            if stream:
+                sys.stdout.write(safe)
+                sys.stdout.flush()
+            # Also to the trace: a run that dies mid-flight used to leave its tool calls but not
+            # a word of its reasoning, and the reasoning is what tells you WHY it was still going.
+            if trace_fp:
+                trace_fp.write(json.dumps({"text": safe}, sort_keys=True) + "\n")
+                trace_fp.flush()
         elif kind == "tool":
             name, inp = payload
             line = trace_line(name, inp, patterns, secret_values)
@@ -796,10 +803,15 @@ async def run(trigger, prompt, stream=None, trace=None):
                 trace_fp.write(line + "\n")
                 trace_fp.flush()
 
+    # Accumulated OUTSIDE _collect, because asyncio.wait_for CANCELS the coroutine on timeout and
+    # anything held only in its locals dies with it. A killed run's partial answer is usually the
+    # whole diagnosis, so it has to survive the kill.
+    text_parts, tool_calls, result_msg = [], 0, None
+
     async def _collect(gen):
         """Iterate the SDK's async generator; accumulate assistant text + capture the final
         ResultMessage (result text, subtype, total_cost_usd); emit observability events per turn."""
-        text_parts, result_msg, tool_calls = [], None, 0
+        nonlocal tool_calls, result_msg
         async for message in gen:
             if isinstance(message, AssistantMessage):
                 for block in message.content:
@@ -811,29 +823,33 @@ async def run(trigger, prompt, stream=None, trace=None):
                         _on_event("tool", (block.name, block.input))
             elif isinstance(message, ResultMessage):
                 result_msg = message
-        return "".join(text_parts), result_msg, tool_calls
 
     wall_clock = budget.get("wall_clock_seconds") or 90
     gen = query(prompt=prompt, options=options)
     if stream:
         print(f"--- streaming {charter['id']} (trigger={trigger}) ---")
     t0 = time.time()
-    killed = False
-    tool_calls = 0
+    killed = interrupted = False
+    failure = None
     try:
-        assistant_text, result_msg, tool_calls = await asyncio.wait_for(
-            _collect(gen), timeout=wall_clock
-        )
+        await asyncio.wait_for(_collect(gen), timeout=wall_clock)
     except asyncio.TimeoutError:
         killed = True
-        assistant_text, result_msg = "", None
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        # Ctrl-C, or a scheduler's SIGINT. Before this, an interrupted run left a trace file and
+        # NOTHING else — no output, no runs.jsonl line — so the one run you most want to explain
+        # was the one run with no record of it.
+        interrupted = True
+    except Exception as e:  # noqa: BLE001 - any SDK/transport error must still leave a record
+        failure = f"{type(e).__name__}: {e}"
+    finally:
         try:
             await gen.aclose()  # cancel cleanly rather than leak the underlying subprocess
         except Exception:  # noqa: BLE001,S110 - best-effort cleanup on a dying run
             pass
-    finally:
         if trace_fp:
             trace_fp.close()
+    assistant_text = "".join(text_parts)
     elapsed = round(time.time() - t0, 1)
 
     cost = result_msg.total_cost_usd if result_msg else None
@@ -841,6 +857,12 @@ async def run(trigger, prompt, stream=None, trace=None):
     if killed:
         outcome = "killed"
         print(f"KILLED: wall-clock timeout {wall_clock}s hit")
+    elif interrupted:
+        outcome = "interrupted"
+        print("INTERRUPTED: signal received; partial output (if any) was still saved")
+    elif failure:
+        outcome = "failed"
+        print(f"FAILED: {failure}")
     elif result_msg is None:
         outcome = "failed"
     elif result_msg.subtype == "error_during_execution":
@@ -883,6 +905,7 @@ async def run(trigger, prompt, stream=None, trace=None):
             "model": charter["model"]["id"],
             "duration_s": elapsed,
             "outcome": outcome,
+            "reason": failure,
             "cost_usd": cost,
             "tool_calls": tool_calls,
             "invariants": invariants,
@@ -905,9 +928,11 @@ async def run(trigger, prompt, stream=None, trace=None):
                 f"  {'PASS' if r['pass'] else 'FAIL'}  {r['case']}:{r['invariant']}"
                 + (f"  <- {r['detail']}" if r["detail"] else "")
             )
-    if outcome == "killed":
-        # Wall-clock or step cap: nothing completed. Exiting 0 here would report success to a
-        # scheduler for the one failure it most needs to hear about. Matches run_headless.py.
+    if outcome in ("killed", "interrupted"):
+        # Nothing completed, whether by wall clock, step cap, or signal. Exiting 0 here would
+        # report success to a scheduler for the one failure it most needs to hear about. The two
+        # causes share an exit code because the caller's response is the same; runs.jsonl carries
+        # the distinction, which is where you diagnose it. Matches run_headless.py.
         sys.exit(5)
     if outcome == "failed":
         sys.exit(1)

@@ -1083,6 +1083,7 @@ async def run(trigger, prompt):
     err = None
     timed_out = False
     step_capped = False
+    interrupted = False
     try:
         result = await asyncio.wait_for(
             agent.ainvoke(inputs, config={"recursion_limit": recursion_limit}),
@@ -1090,6 +1091,11 @@ async def run(trigger, prompt):
         )
     except asyncio.TimeoutError:
         timed_out = True
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        # Ctrl-C, or a scheduler's SIGINT. Without this the run leaves a trace file and NOTHING
+        # else — no output, no runs.jsonl line — so the one run you most want to explain is the
+        # one run with no record of it. Matches the claude-sdk builder.
+        interrupted = True
     except Exception as e:  # noqa: BLE001
         err = e
         is_recursion = (
@@ -1115,6 +1121,9 @@ async def run(trigger, prompt):
     elif step_capped:
         outcome = "killed"
         print(f"KILLED: recursion_limit {recursion_limit} hit (budget.steps={budget.get('steps')})")
+    elif interrupted:
+        outcome = "interrupted"
+        print("INTERRUPTED: signal received; partial output (if any) was still saved")
     elif err is not None:
         outcome = "failed"
         print(f"FAILED: {type(err).__name__}: {err}")
@@ -1185,9 +1194,11 @@ async def run(trigger, prompt):
                 f"  {'PASS' if r['pass'] else 'FAIL'}  {r['case']}:{r['invariant']}"
                 + (f"  <- {r['detail']}" if r["detail"] else "")
             )
-    if outcome == "killed":
-        # Wall-clock or step cap: nothing completed. Exiting 0 here would report success to a
-        # scheduler for the one failure it most needs to hear about. Matches run_headless.py.
+    if outcome in ("killed", "interrupted"):
+        # Nothing completed, whether by wall clock, step cap, or signal. Exiting 0 here would
+        # report success to a scheduler for the one failure it most needs to hear about. The two
+        # causes share an exit code because the caller's response is the same; runs.jsonl carries
+        # the distinction, which is where you diagnose it. Matches run_headless.py.
         sys.exit(5)
     if outcome == "failed":
         sys.exit(1)

@@ -690,6 +690,27 @@ def main():
         )
         _cleanup(tmpfiles)
         sys.exit(5)
+    except KeyboardInterrupt:
+        # Ctrl-C, or a scheduler's SIGINT. Without this the run leaves no runs.jsonl line at all,
+        # so the one run you most want to explain is the one run with no record of it. The child
+        # process group is killed the same way a timeout kills it — otherwise `claude` and
+        # anything it spawned outlive the runner that was supposed to bound them.
+        elapsed = round(time.time() - t0, 1)
+        _kill_process_group(proc)
+        print("\nINTERRUPTED: signal received")
+        log_run(
+            charter_dir,
+            {
+                "name": name,
+                "timestamp": now(),
+                "trigger": args.trigger,
+                "model": charter["model"]["id"],
+                "outcome": "interrupted",
+                "duration_s": elapsed,
+            },
+        )
+        _cleanup(tmpfiles)
+        sys.exit(5)
     _cleanup(tmpfiles)
 
     result, cost = "", None
