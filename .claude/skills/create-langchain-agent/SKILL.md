@@ -36,6 +36,12 @@ Create `builders/langchain/agents/<id>/` and write the brief there as `brief.yam
 chart + regeneration input). If run standalone, read an existing `agents/<id>/brief.yaml` instead
 of re-interviewing.
 
+**Before generating: check `data_source` in the brief.** If it says `verified: no`, or the field
+is missing on an agent that depends on an external source, stop and fetch that source once by
+hand now. A charter describing an agent that cannot get its data is waste, and the fetch takes a
+minute. If the source is genuinely unreachable, say so and re-plan the purpose with the creator
+rather than generating around it.
+
 ## Ask the provider (safety + billing — confirm aloud)
 The one genuinely LangChain-specific interview question. LangChain is multi-provider; this builder
 ships **Anthropic** wired, with the `model.provider` seam in place for others.

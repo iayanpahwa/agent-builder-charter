@@ -32,6 +32,12 @@ Create `builders/claude-sdk/agents/<id>/` and write the brief there as `brief.ya
 chart + regeneration input). If run standalone, read an existing `agents/<id>/brief.yaml`
 instead of re-interviewing.
 
+**Before generating: check `data_source` in the brief.** If it says `verified: no`, or the field
+is missing on an agent that depends on an external source, stop and fetch that source once by
+hand now. A charter describing an agent that cannot get its data is waste, and the fetch takes a
+minute. If the source is genuinely unreachable, say so and re-plan the purpose with the creator
+rather than generating around it.
+
 ## Ask the auth mode (safety + billing — confirm aloud)
 The one genuinely SDK-specific interview question. Two modes:
 - **api-key** — `ANTHROPIC_API_KEY` (console billing). The **sanctioned, shareable** mode:

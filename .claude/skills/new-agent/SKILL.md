@@ -77,6 +77,32 @@ confirm each aloud.
 
 Record these as intents; the generator wires them.
 
+## Prove the data source BEFORE writing anything
+If the agent's value depends on an external source — a site it must read, an API it must call —
+**fetch it once, by hand, right now**, before a charter exists. Not a search for whether the
+source exists; an actual request for the actual data, and read what comes back.
+
+The correct order is **prove the source → charter → guardrails → evals**, because every later
+step is wasted if the data can't be got. A charter is a description of an agent that works; there
+is nothing to describe until the source answers.
+
+What to check, in order:
+1. **Fetch the real URL.** A JS shell with no data in it is a failure, not a success — look at
+   the body, don't just check the status code.
+2. **If it's blocked**, say so plainly and stop to re-plan. Anti-bot walls (`403`, `429`,
+   CAPTCHA, `520`) frequently survive browser rendering and paid unblocking too. "We'll add a
+   scraping service" is a hypothesis, and it needs the same one-fetch proof before you rely on it.
+3. **Verify any service YOU recommend, live, at the moment you recommend it.** A model's memory
+   of which APIs exist is exactly as old as its training data. Fetch the provider's own page and
+   confirm the product is still offered before naming it.
+
+Record the outcome in `brief.yaml` under `data_source` — including a failure, which is the most
+valuable thing this step produces. If the source can't be got, the honest options are: pick a
+different source, narrow the purpose to what IS reachable, or don't build the agent. Say which.
+
+For a text-only agent, or one that reads only local files the creator already has, skip this and
+note `data_source: {verified: not-applicable}`.
+
 ## Write the brief and hand off
 Present the complete **brief** as a neutral YAML block and confirm it with the human, then
 dispatch.
@@ -98,6 +124,11 @@ credentials: []               # {name, ref, scope}  (ref = pointer, never the va
 network:
   policy: allow-list          # allow-list | open | none
   hosts: []                   # for allow-list
+data_source:                  # the one-fetch proof above; a failure here is a finding, not a gap
+  verified: yes               # yes | no | not-applicable
+  checked: "<YYYY-MM-DD>"
+  url: "<the exact URL fetched>"
+  result: "<what came back: real data / JS shell / 403 / CAPTCHA / decommissioned>"
 data:
   class: public
   sensitive: false

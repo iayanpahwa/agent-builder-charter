@@ -19,6 +19,12 @@ Create `builders/claude-headless/agents/<id>/` and write the brief there as `bri
 durable chart + regeneration input). If run standalone, read an existing
 `agents/<id>/brief.yaml` instead of re-interviewing.
 
+**Before generating: check `data_source` in the brief.** If it says `verified: no`, or the field
+is missing on an agent that depends on an external source, stop and fetch that source once by
+hand now. A charter describing an agent that cannot get its data is waste, and the fetch takes a
+minute. If the source is genuinely unreachable, say so and re-plan the purpose with the creator
+rather than generating around it.
+
 ## The one rule (concretizing is where safety hides)
 The brief holds NEUTRAL intents; turning them into headless specifics can silently decide a
 safety field, so **re-confirm each concretized SAFETY value aloud with the human before
