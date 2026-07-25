@@ -1,0 +1,8 @@
+# Revisions to skip when running `git blame` — bulk reformats, not authorship.
+#
+# Enable locally (once per clone):
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# GitHub honours this file automatically in its blame view.
+
+# Format the codebase at 100 columns (whitespace only, AST-verified)
+f2ba2f6d3e525a91f30878b595381acc49d2263e
