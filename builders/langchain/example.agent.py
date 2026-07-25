@@ -132,6 +132,27 @@ def scoped_env(charter, src=None):
     return env
 
 
+def required_env(charter):
+    """The env var names this charter declares, in order: [(var, is_auth), ...]. Derived from the
+    charter so it can never go stale the way a hardcoded name in a launcher does.
+
+    Unlike the Claude runtimes, nothing here has a stored-login fallback — LangChain reads its
+    provider key straight from the environment — so `is_auth` is always False and every declared
+    credential is required."""
+    return [
+        (cred["ref"][4:], False)
+        for cred in charter.get("credentials") or []
+        if cred.get("ref", "").startswith("env:")
+    ]
+
+
+def missing_credentials(charter, src=None):
+    """(fatal, warn) — declared env credentials absent from `src`. `warn` is always empty here;
+    the pair shape matches the Claude runtimes so callers stay identical. Pure."""
+    src = os.environ if src is None else src
+    return [v for v, _ in required_env(charter) if not src.get(v)], []
+
+
 def _host_allowed(host, egress):
     for pattern in egress:
         bare = pattern[2:] if pattern.startswith("*.") else pattern
@@ -957,6 +978,16 @@ async def run(trigger, prompt):
         print("REFUSED: no task prompt (pass --prompt, or add prompts/task.md)")
         sys.exit(4)
 
+    # Credentials, before a single token is spent. An agent that starts without a key it was
+    # promised does not fail cleanly: it runs, gets 401s it was not written to expect, and
+    # reports a confident empty answer. Refuse instead.
+    fatal, _ = missing_credentials(charter)
+    if fatal:
+        print(f"REFUSED: declared credential(s) not set in the environment: {', '.join(fatal)}")
+        print("  the charter declares them under `credentials:`; export them, or add them to")
+        print(f"  {os.path.join(HERE, '.env')} for unattended runs")
+        sys.exit(9)
+
     # After the cheap config gates, before anything is spent: one run at a time. Logged, because
     # a scheduler overlapping itself is exactly the thing you need the log to be able to show.
     if not acquire_run_lock():
@@ -1176,7 +1207,19 @@ def main():
         help="print the enforcement report; do not run, no tokens spent",
     )
     ap.add_argument("--prompt", default=None, help="task prompt; default is prompts/task.md")
+    ap.add_argument(
+        "--required-env",
+        action="store_true",
+        help="print the env var names this charter declares, one per line; no tokens spent",
+    )
     args = ap.parse_args()
+
+    # Derived from the charter, so a launcher or CI check that consumes this can never drift
+    # from what the agent actually needs the way a hardcoded credential name does.
+    if args.required_env:
+        for var, _ in required_env(CHARTER):
+            print(var)
+        return
 
     if args.dry_run:
         print(enforcement_report(CHARTER))

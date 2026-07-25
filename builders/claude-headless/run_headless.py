@@ -482,6 +482,35 @@ _ESSENTIAL_VARS = ("PATH", "HOME", "USER", "LOGNAME", "SHELL", "TERM", "TMPDIR",
 _ESSENTIAL_PREFIXES = ("LC_", "ANTHROPIC_", "CLAUDE_")  # locale + Claude Code's own auth/config
 
 
+# The two vars the `claude` CLI can do without: it falls back to a stored login (Keychain, or
+# `claude login`), so a run may authenticate perfectly well with neither one set. Every OTHER
+# declared credential has no fallback anywhere — if it is missing the agent runs believing it
+# holds a key it does not have, which is the failure the preflight below exists to stop.
+_AUTH_VARS = ("ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN")
+
+
+def required_env(charter):
+    """The env var names this charter declares, in order: [(var, is_auth), ...]. Derived from the
+    charter so it can never go stale the way a hardcoded name in a launcher does."""
+    out = []
+    for cred in charter.get("credentials") or []:
+        ref = cred.get("ref", "")
+        if ref.startswith("env:"):
+            var = ref[4:]
+            out.append((var, var in _AUTH_VARS))
+    return out
+
+
+def missing_credentials(charter, src=None):
+    """(fatal, warn) — declared env credentials absent from `src`. Auth vars only warn, because
+    the CLI may authenticate from a stored login; anything else is fatal. Pure; `src` defaults to
+    os.environ."""
+    src = os.environ if src is None else src
+    fatal = [v for v, is_auth in required_env(charter) if not is_auth and not src.get(v)]
+    warn = [v for v, is_auth in required_env(charter) if is_auth and not src.get(v)]
+    return fatal, warn
+
+
 def scoped_env(charter):
     """The subprocess environment: Claude's own auth + OS essentials + the charter's
     declared `env:` credentials — and nothing else. Every other host secret is dropped.
@@ -515,6 +544,11 @@ def main():
     ap.add_argument("--prompt", default=None)
     ap.add_argument("--eval", action="store_true")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument(
+        "--required-env",
+        action="store_true",
+        help="print the env var names this charter declares, one per line; no tokens spent",
+    )
     args = ap.parse_args()
 
     charter_path = os.path.abspath(args.charter)
@@ -527,6 +561,13 @@ def main():
         print(f"REFUSED: invalid charter ({e})")
         sys.exit(2)
     name = charter["id"]
+
+    # Derived from the charter, so a launcher or CI check that consumes this can never drift
+    # from what the agent actually needs the way a hardcoded credential name does.
+    if args.required_env:
+        for var, _ in required_env(charter):
+            print(var)
+        return
 
     if charter.get("status") != "enabled":
         print(f"REFUSED: status={charter.get('status')} (not enabled)")
@@ -551,6 +592,19 @@ def main():
     if not prompt:
         print("REFUSED: no task prompt (pass --prompt, or add prompts/task.md)")
         sys.exit(4)
+
+    # Credentials, before a single token is spent. An agent that starts without a key it was
+    # promised does not fail cleanly: it runs, gets 401s it was not written to expect, and
+    # reports a confident empty answer. Refuse instead.
+    fatal, warn = missing_credentials(charter)
+    if fatal:
+        print(f"REFUSED: declared credential(s) not set in the environment: {', '.join(fatal)}")
+        print("  the charter declares them under `credentials:`; export them, or add them to")
+        print(f"  {os.path.join(charter_dir, '.env')} for unattended runs")
+        sys.exit(9)
+    for var in warn:
+        print(f"WARNING: {var} is declared but not set — falling back to the CLI's stored login.")
+        print("  The run may still authenticate, but NOT via the credential this charter names.")
 
     # After the cheap config gates, before anything is spent: one run at a time. Logged, because
     # a scheduler overlapping itself is exactly the thing you need the log to be able to show.

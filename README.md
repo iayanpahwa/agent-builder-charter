@@ -263,9 +263,28 @@ The whole point of a scheduled agent is that nobody is watching, so the exit cod
 | `6` | dependencies missing (shouldn't happen after provisioning) |
 | `7` | dependencies changed since provisioning — re-provision |
 | `8` | refused — another run of this agent is in progress |
+| `9` | refused — a credential the charter declares is not set |
 
 Anything non-zero deserves a look. `5` in particular is a run that produced nothing: with
 `MAILTO` set, or any wrapper that checks `$?`, it will reach you.
+
+### Credentials are checked before anything is spent
+
+Every runner refuses with `9` when an env credential the charter declares is missing, before it
+reaches a model. This is not defensive programming: an agent that starts without a key it was
+promised does not crash, it gets 401s it was never written to expect and reports a confident
+empty answer.
+
+The list of names is derived from the charter at run time — `<agent>/run --required-env` prints
+it — so it cannot go stale. A launcher that hardcodes a credential name is the thing this
+replaces: add a second credential and the hardcoded check still passes while the agent runs
+without the new key.
+
+The two Claude auth vars (`ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN`) warn rather than
+refuse on the `headless` and `claude-sdk` runtimes, because the `claude` CLI can authenticate
+from a stored login — the run may well succeed, just not via the credential the charter names,
+and the warning says exactly that. On `langchain` there is no such fallback, so they are
+required like any other.
 
 ## How it works: the spine
 
