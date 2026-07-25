@@ -147,6 +147,65 @@ def missing_credentials(charter, src=None):
     return fatal, warn
 
 
+def _diff_paths(a, b, prefix=""):
+    """Dotted paths where two nested structures disagree. Compares by VALUE, so the YAML/Python
+    round-trip differences that actually bite — a trailing newline from a `>` block scalar, a
+    regex whose backslashes survive in one and not the other — show up as the mismatches they
+    are rather than passing a shallow key check."""
+    out = []
+    if isinstance(a, dict) and isinstance(b, dict):
+        for k in sorted(set(a) | set(b)):
+            here = f"{prefix}.{k}" if prefix else str(k)
+            if k not in a:
+                out.append(f"{here}: only in charter.yaml")
+            elif k not in b:
+                out.append(f"{here}: only in the embedded CHARTER")
+            else:
+                out.extend(_diff_paths(a[k], b[k], here))
+    elif isinstance(a, list) and isinstance(b, list):
+        if len(a) != len(b):
+            out.append(f"{prefix}: {len(a)} items embedded vs {len(b)} in charter.yaml")
+        else:
+            for i, (x, y) in enumerate(zip(a, b)):
+                out.extend(_diff_paths(x, y, f"{prefix}[{i}]"))
+    elif a != b:
+        out.append(f"{prefix}: embedded {a!r} != charter.yaml {b!r}")
+    return out
+
+
+def charter_drift(charter, path=None):
+    """Report lines describing where the embedded CHARTER and the sibling charter.yaml disagree.
+
+    This agent carries its charter twice: embedded so the .py runs standalone, and as a sibling
+    file for audit and regeneration. Two sources of truth drift, and it is silent when they do —
+    the audited file says one thing while the running agent does another, which makes the audit
+    worthless in exactly the case it matters. Reported at --dry-run, where someone is looking.
+
+    Never raises: a dry-run that dies because PyYAML is absent helps nobody.
+    """
+    path = path or os.path.join(HERE, "charter.yaml")
+    if not os.path.exists(path):
+        return []
+    try:
+        import yaml
+
+        with open(path) as f:
+            on_disk = yaml.safe_load(f)
+    except Exception as e:  # noqa: BLE001 - a diagnostic must never break the thing it diagnoses
+        return [f"NOTE: could not read {os.path.basename(path)} to check for drift ({e})"]
+    diffs = _diff_paths(charter, on_disk)
+    if not diffs:
+        return []
+    lines = [
+        f"DRIFT: the embedded CHARTER and {os.path.basename(path)} disagree. The embedded copy is "
+        "what runs; the file is what gets audited. Regenerate rather than editing either by hand:"
+    ]
+    lines.extend(f"  - {d}" for d in diffs[:10])
+    if len(diffs) > 10:
+        lines.append(f"  … and {len(diffs) - 10} more")
+    return lines
+
+
 def _expand_tilde(path, src):
     """Expand a leading '~' using src['HOME'] — NOT os.path.expanduser, which reads the real
     process environment and would ignore a caller-supplied `src` dict in tests."""
@@ -655,9 +714,22 @@ def enforcement_report(charter):
     else:
         lines.append(
             "billing/ToS: no api-key/subscription credential declared — scoped_env drops "
-            "ANTHROPIC_API_KEY, CLAUDE_CODE_OAUTH_TOKEN, and ANTHROPIC_AUTH_TOKEN; a real "
-            "run will fail to authenticate."
+            "ANTHROPIC_API_KEY, CLAUDE_CODE_OAUTH_TOKEN, and ANTHROPIC_AUTH_TOKEN."
         )
+
+    # What the charter DECLARES is not always how the run actually authenticates: the `claude`
+    # CLI falls back to a stored login, so an agent whose declared credential is unset still
+    # runs — just not by the route the charter names. Saying "will fail to authenticate" there
+    # would be this report lying about the one thing it exists to be honest about.
+    for var, _ in required_env(charter):
+        if var in _AUTH_VARS and not os.environ.get(var):
+            lines.append(
+                f"CAVEAT: {var} is declared but NOT set in this environment. The run may still "
+                "authenticate from the CLI's stored login (`claude login` / Keychain), in which "
+                "case the credential this charter names is not the real auth path — and the "
+                "account actually billed is whichever one that login belongs to."
+            )
+    lines.extend(charter_drift(charter))
     lines.append(CACHING_NOTE)
     lines.append("\n[dry-run] not executed.")
     return "\n".join(lines)
