@@ -47,7 +47,7 @@ approval_tier:
 data:
   class: internal
   retention_days: 7
-  redact: [token]
+  redact: ["(?i)token\\s*[:=]\\s*[A-Za-z0-9_\\-]{16,}"]   # the VALUE, not the word
 
 evals:
   suite: "evals/repo-researcher/cases.yaml"

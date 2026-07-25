@@ -288,8 +288,11 @@ def summary(agent_dir, agent_id, runtime, run_path, missing_creds):
     if RUNTIMES[runtime]["trace"]:
         print(f"      {os.path.join(logs, '<timestamp>.trace.jsonl')}")
         print("          per-tool-call trace, when extensions.observability.trace is on")
+    # `sort | tail -1`, not `ls -t`: output files are named %Y%m%dT%H%M%S, so lexicographic order
+    # IS chronological, and this avoids `-t` entirely. On a machine where `ls` is aliased to eza,
+    # `-t` takes a FIELD argument instead of sorting by time and silently swallows the next word.
     print("\n  Latest output at any time")
-    print(f"      ls -t {os.path.join(logs, '*.output.txt')} | head -1 | xargs cat")
+    print(f"      ls {os.path.join(logs, '*.output.txt')} | sort | tail -1 | xargs cat")
     print("\n  Last 5 runs at a glance")
     print(f"      tail -5 {os.path.join(logs, 'runs.jsonl')}")
     if missing_creds:

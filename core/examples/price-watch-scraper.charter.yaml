@@ -64,9 +64,9 @@ approval_tier:
 data:
   class: internal
   retention_days: 30
-  redact:
-    - api_key
-    - cookie
+  redact:                     # match the VALUE; a bare `api_key` also matches prose
+    - "(?i)api[_-]?key\\s*[:=]\\s*[A-Za-z0-9_\\-]{16,}"
+    - "(?i)cookie\\s*[:=]\\s*\\S{16,}"
 
 evals:
   suite: "evals/price-watch/cases.yaml"

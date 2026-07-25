@@ -149,7 +149,7 @@ Your agent is ready: <id>
           the agent's full response, after redaction
 
   Latest output, any time
-      ls -t builders/claude-headless/agents/<id>/logs/*.output.txt | head -1 | xargs cat
+      ls builders/claude-headless/agents/<id>/logs/*.output.txt | sort | tail -1 | xargs cat
 
   Change anything
       re-run /new-agent — never hand-edit charter.yaml

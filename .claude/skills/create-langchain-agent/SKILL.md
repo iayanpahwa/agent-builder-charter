@@ -276,7 +276,7 @@ Your agent is ready: <id>
           per-tool-call trace, when extensions.observability.trace is on
 
   Latest output, any time
-      ls -t builders/langchain/agents/<id>/logs/*.output.txt | head -1 | xargs cat
+      ls builders/langchain/agents/<id>/logs/*.output.txt | sort | tail -1 | xargs cat
 
   Change anything
       re-run /new-agent — never hand-edit charter.yaml or agent.py
