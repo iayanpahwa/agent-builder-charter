@@ -46,7 +46,30 @@ sys.path.insert(0, os.path.join(HERE, "..", "..", "core"))  # shared runtime-neu
 import eval_checks  # noqa: E402
 from loader import CharterInvalid, load_charter  # noqa: E402
 
-DANGEROUS = ["Bash", "Write", "Edit", "MultiEdit", "NotebookEdit", "Task"]
+# Denied unless the charter explicitly grants them. Under bypassPermissions this list is the ONLY
+# real tool wall (allowed_tools is declarative there, see enforcement_report), so a name that no
+# longer matches a live tool is a silent hole. Verified against the `claude` CLI's own tool
+# registry on 2026-07-25 (v2.1.220):
+#   Bash             a shell, and a network path the egress hook does not gate.
+#   Write/Edit/
+#   NotebookEdit     filesystem mutation.
+#   MultiEdit        no longer a callable tool; the CLI still accepts it in permission rules, so
+#                    it stays as an inert guard for older versions.
+#   Task             the registered ALIAS of Agent; kept so the deny also holds on older CLIs.
+#   Agent            the CANONICAL name for subagent delegation. Spawning a subagent hands work to
+#                    a fresh context with its own tool access, which widens authority past what
+#                    this charter declared. Denying only "Task" left this open.
+#   AskUserQuestion  an unattended agent has nobody to ask; granting it buys a hang, not an answer.
+DANGEROUS = [
+    "Bash",
+    "Write",
+    "Edit",
+    "MultiEdit",
+    "NotebookEdit",
+    "Task",
+    "Agent",
+    "AskUserQuestion",
+]
 
 # A --dry-run note, not a wall. Prompt caching here belongs to the `claude` CLI: this runner shells
 # out to it and the CLI builds the actual API request, so caching is automatic and there is no flag
