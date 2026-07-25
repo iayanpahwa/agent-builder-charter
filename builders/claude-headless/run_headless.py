@@ -4,7 +4,7 @@ run_headless.py — turn a CHARTER charter into an ENFORCED headless `claude -p`
 
 This IS the loader for the headless runtime: the charter is the only source of the
 agent's model, tools, network, turns, timeout, and (scoped) environment. The process
-this script launches is the agent. The agent's own `run.sh` just calls this.
+this script launches is the agent. The agent's own `run` just calls this.
 
 Real walls in headless (this is why headless beats the interactive-subagent path):
   model                      -> --model
@@ -29,6 +29,7 @@ Usage:
 """
 
 import argparse
+import fcntl
 import json
 import os
 import re
@@ -57,6 +58,31 @@ CACHING_NOTE = (
     "CLI's caching silently stops paying off."
 )
 NET_TOOLS = {"WebFetch", "WebSearch"}
+
+
+# --- one run at a time -----------------------------------------------------
+# Held for the life of the process on purpose: closing the fd releases the lock, so this must
+# outlive the function that took it.
+_RUN_LOCK_FD = None
+
+
+def acquire_run_lock(charter_dir):
+    """True if this process now owns the agent's run lock, False if another run holds it.
+
+    An advisory flock on a file in the agent dir. The kernel drops it when this process dies —
+    including SIGKILL and a hard timeout — so an interrupted run can never strand the lock the
+    way a pidfile or a mkdir lock does. Matters once a schedule fires faster than a run finishes:
+    without it, two runs share one budget, one log, and one output directory.
+    """
+    global _RUN_LOCK_FD
+    _RUN_LOCK_FD = open(os.path.join(charter_dir, ".run.lock"), "w")
+    try:
+        fcntl.flock(_RUN_LOCK_FD, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:  # already held — BlockingIOError on Linux, EAGAIN/EWOULDBLOCK on macOS
+        _RUN_LOCK_FD.close()
+        _RUN_LOCK_FD = None
+        return False
+    return True
 
 
 # --- logging --------------------------------------------------------------
@@ -526,6 +552,22 @@ def main():
         print("REFUSED: no task prompt (pass --prompt, or add prompts/task.md)")
         sys.exit(4)
 
+    # After the cheap config gates, before anything is spent: one run at a time. Logged, because
+    # a scheduler overlapping itself is exactly the thing you need the log to be able to show.
+    if not acquire_run_lock(charter_dir):
+        print("REFUSED: another run of this agent is already in progress")
+        log_run(
+            charter_dir,
+            {
+                "name": name,
+                "timestamp": now(),
+                "trigger": args.trigger,
+                "outcome": "refused",
+                "reason": "another run in progress",
+            },
+        )
+        sys.exit(8)
+
     try:
         cmd, tmpfiles = build_command(charter, charter_dir, charter_path, prompt)
     except CharterInvalid as e:
@@ -586,7 +628,9 @@ def main():
                 "timestamp": now(),
                 "trigger": args.trigger,
                 "model": charter["model"]["id"],
-                "outcome": "timeout",
+                # "killed" is the shared vocabulary across all three builders: the run was cut
+                # short and produced nothing, whether by wall clock (here) or a step cap.
+                "outcome": "killed",
                 "duration_s": elapsed,
             },
         )

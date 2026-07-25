@@ -27,6 +27,7 @@ Real walls this runner enforces (see enforcement_report() / --dry-run for the ho
 # ---- stdlib only at import time; langchain/langgraph are imported LAZILY inside run() ----
 import argparse
 import asyncio
+import fcntl
 import json
 import os
 import re
@@ -379,6 +380,31 @@ def check_one(invariant, output):
 def check_all(invariants, output):
     """Returns [(name, ok, detail), ...] for each invariant in the list."""
     return [check_one(inv, output) for inv in (invariants or [])]
+
+
+# ---- one run at a time (mirrors run_headless.py / the claude-sdk agent) ----------------------
+# Held for the life of the process on purpose: closing the fd releases the lock, so this must
+# outlive the function that took it.
+_RUN_LOCK_FD = None
+
+
+def acquire_run_lock():
+    """True if this process now owns the agent's run lock, False if another run holds it.
+
+    An advisory flock on a file in the agent dir. The kernel drops it when this process dies —
+    including SIGKILL and a hard timeout — so an interrupted run can never strand the lock the
+    way a pidfile or a mkdir lock does. Matters once a schedule fires faster than a run finishes:
+    without it, two runs share one budget, one log, and one output directory.
+    """
+    global _RUN_LOCK_FD
+    _RUN_LOCK_FD = open(os.path.join(HERE, ".run.lock"), "w")
+    try:
+        fcntl.flock(_RUN_LOCK_FD, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:  # already held — BlockingIOError on Linux, EAGAIN/EWOULDBLOCK on macOS
+        _RUN_LOCK_FD.close()
+        _RUN_LOCK_FD = None
+        return False
+    return True
 
 
 # ---- run-log helpers (mirror run_headless.py / the claude-sdk agent) --------------------------
@@ -931,6 +957,21 @@ async def run(trigger, prompt):
         print("REFUSED: no task prompt (pass --prompt, or add prompts/task.md)")
         sys.exit(4)
 
+    # After the cheap config gates, before anything is spent: one run at a time. Logged, because
+    # a scheduler overlapping itself is exactly the thing you need the log to be able to show.
+    if not acquire_run_lock():
+        print("REFUSED: another run of this agent is already in progress")
+        _log_run(
+            {
+                "id": charter["id"],
+                "timestamp": now(),
+                "trigger": trigger,
+                "outcome": "refused",
+                "reason": "another run in progress",
+            }
+        )
+        sys.exit(8)
+
     # Apply the scoped env by REPLACING the process env — langchain reads the provider key
     # (ANTHROPIC_API_KEY) straight from os.environ, so this .py must run as its own process.
     env = scoped_env(charter)
@@ -1113,6 +1154,10 @@ async def run(trigger, prompt):
                 f"  {'PASS' if r['pass'] else 'FAIL'}  {r['case']}:{r['invariant']}"
                 + (f"  <- {r['detail']}" if r["detail"] else "")
             )
+    if outcome == "killed":
+        # Wall-clock or step cap: nothing completed. Exiting 0 here would report success to a
+        # scheduler for the one failure it most needs to hear about. Matches run_headless.py.
+        sys.exit(5)
     if outcome == "failed":
         sys.exit(1)
 
