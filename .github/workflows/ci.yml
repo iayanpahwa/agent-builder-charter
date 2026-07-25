@@ -13,23 +13,24 @@ permissions:
   contents: read
 
 jobs:
-  check:
+  # Split from the test job on purpose. black and ruff are standalone tools: the interpreter they
+  # RUN on has nothing to do with the version this code TARGETS, which pyproject.toml pins for
+  # both (`target-version = py39`), so their output here is identical to a 3.9 run. Installing
+  # them under 3.9 instead capped them at whatever the last 3.9-compatible release was — black
+  # dropped 3.9 at 25.12.0, so the pinned 26.5.1 simply could not be installed and CI failed at
+  # the install step before running anything.
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
-          # 3.9 is the floor the tooling targets (see pyproject.toml target-version). Running CI
-          # on it catches syntax a newer local interpreter would happily accept.
-          python-version: "3.9"
+          python-version: "3.13"
 
       # Pinned so a tool release cannot turn a green branch red on its own. Bump deliberately.
       - name: Install tools
         run: pip install --disable-pip-version-check "black==26.5.1" "ruff==0.16.0"
-
-      - name: Install test dependencies
-        run: pip install --disable-pip-version-check -r requirements.txt
 
       # black formats, ruff lints — see the note in pyproject.toml on why not both formatters.
       - name: Format check
@@ -37,6 +38,24 @@ jobs:
 
       - name: Lint
         run: ruff check --output-format github .
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # 3.9 is the floor the tooling targets (see pyproject.toml target-version). Running the
+          # suite on it catches syntax a newer local interpreter would happily accept — this job
+          # is what actually holds that floor.
+          python-version: "3.9"
+
+      # requirements.txt is the runtime dependency (PyYAML + jsonschema, what core/loader.py and
+      # the headless runner import); requirements-dev.txt adds pytest. Both are needed, and
+      # omitting the latter meant `python -m pytest` had no pytest to run.
+      - name: Install test dependencies
+        run: pip install --disable-pip-version-check -r requirements.txt -r requirements-dev.txt
 
       - name: Tests
         run: python -m pytest -q
