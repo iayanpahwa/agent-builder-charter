@@ -16,6 +16,16 @@ builders/*/agents/*/logs/
 builders/claude-sdk/logs/
 builders/langchain/logs/
 
+# Written by core/provision.py and specific to ONE machine — the venv bakes absolute paths
+# into pyvenv.cfg and the run shim bakes them into itself, so neither survives being copied
+# to another host. Deploy the agent dir without these and re-provision there.
+builders/*/agents/*/.venv/
+builders/*/agents/*/run
+# Per-agent credentials for unattended runs, if you use one. Never commit.
+builders/*/agents/*/.env
+# The run lock — an empty file whose only meaning is "a run holds an flock on this right now".
+builders/*/agents/*/.run.lock
+
 # Stray "~" dirs the harness creates by writing session logs to a relative "~"
 # (at the repo root or under a builder). Not project content. Do NOT delete by
 # hand — they hold live session/subagent transcripts, and removing them breaks
