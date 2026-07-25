@@ -1,0 +1,50 @@
+name: ci
+
+# Formatting, linting, and the test suite. The suite is deliberately offline: no charter is
+# executed, no model is called, no `claude` CLI is needed. Every wall this repo claims is tested
+# as a pure function (see tests/), so CI can prove the enforcement story without spending tokens.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # 3.9 is the floor the tooling targets (see pyproject.toml target-version). Running CI
+          # on it catches syntax a newer local interpreter would happily accept.
+          python-version: "3.9"
+
+      # Pinned so a tool release cannot turn a green branch red on its own. Bump deliberately.
+      - name: Install tools
+        run: pip install --disable-pip-version-check "black==26.5.1" "ruff==0.16.0"
+
+      - name: Install test dependencies
+        run: pip install --disable-pip-version-check -r requirements.txt
+
+      # black formats, ruff lints — see the note in pyproject.toml on why not both formatters.
+      - name: Format check
+        run: black --check --diff .
+
+      - name: Lint
+        run: ruff check --output-format github .
+
+      - name: Tests
+        run: python -m pytest -q
+
+      # The charters shipped in the repo are also covered by tests/test_schema_validation.py;
+      # running the validator directly proves the documented one-liner still works as advertised.
+      - name: Validate shipped charters
+        run: |
+          for charter in $(git ls-files '*.charter.yaml'); do
+            python core/validate.py "$charter"
+          done

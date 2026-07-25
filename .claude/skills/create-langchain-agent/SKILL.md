@@ -205,6 +205,12 @@ cases:
 ```
 
 ## Validate and finish
+The generated `agent.py` has to satisfy the repo's tooling, same as any file here: run
+`black builders/langchain/agents/<id>/agent.py` and then `ruff check` on it, and fix what they
+report, before step 2. `example.agent.py` is formatted at 100 columns (`pyproject.toml`), so a
+transcribed copy that drifts will fail CI — and the diff noise makes a generated agent hard to
+compare against the reference it came from.
+
 1. `python3 core/validate.py builders/langchain/agents/<id>/charter.yaml` (from the REPO ROOT) →
    loop until `VALID`.
 2. Read the SAFETY fields back in plain English (provider + which env var is kept and which
