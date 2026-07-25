@@ -57,6 +57,17 @@ CHARTER = {
 
 DANGEROUS = ["Bash", "Write", "Edit", "MultiEdit", "NotebookEdit", "Task"]
 
+# A --dry-run note, not a wall. Prompt caching on this runtime belongs to the `claude` CLI: the SDK
+# shells out to it and the CLI builds the actual API request, so caching is automatic and there is
+# nothing to enable or tune from here (ClaudeAgentOptions exposes no cache_control). The one thing
+# this agent DOES control is prefix hygiene — see builders/langchain/CLAUDE.md for the full note.
+CACHING_NOTE = (
+    "caching: handled by the `claude` CLI (it builds the request) — automatic, not charter-"
+    "controlled, nothing to enable or tune here. What this agent controls is hygiene: keep volatile "
+    "values (dates, run ids, uuids) OUT of context.trusted_sources, or the cached prefix changes "
+    "every run and the CLI's caching silently stops paying off."
+)
+
 
 # ============================================================================
 # 2. ENFORCEMENT HELPERS — pure, testable, NO SDK import needed
@@ -477,6 +488,7 @@ def enforcement_report(charter):
         lines.append("billing/ToS: no api-key/subscription credential declared — scoped_env drops "
                       "ANTHROPIC_API_KEY, CLAUDE_CODE_OAUTH_TOKEN, and ANTHROPIC_AUTH_TOKEN; a real "
                       "run will fail to authenticate.")
+    lines.append(CACHING_NOTE)
     lines.append("\n[dry-run] not executed.")
     return "\n".join(lines)
 

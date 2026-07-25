@@ -46,6 +46,16 @@ from loader import CharterInvalid, load_charter   # noqa: E402
 import eval_checks                                 # noqa: E402
 
 DANGEROUS = ["Bash", "Write", "Edit", "MultiEdit", "NotebookEdit", "Task"]
+
+# A --dry-run note, not a wall. Prompt caching here belongs to the `claude` CLI: this runner shells
+# out to it and the CLI builds the actual API request, so caching is automatic and there is no flag
+# to set. What a charter DOES control is prefix hygiene (see builders/langchain/CLAUDE.md).
+CACHING_NOTE = (
+    "caching: handled by the `claude` CLI (it builds the request) — automatic, not charter-"
+    "controlled, no flag to set. What a charter controls is hygiene: keep volatile values (dates, "
+    "run ids, uuids) OUT of context.trusted_sources, or the cached prefix changes every run and the "
+    "CLI's caching silently stops paying off."
+)
 NET_TOOLS = {"WebFetch", "WebSearch"}
 
 
@@ -412,6 +422,7 @@ def main():
     print("what this run enforces:")
     for status, field, note in report(charter):
         print(f"  {status:<13} {field:<20} {note}")
+    print("\n" + CACHING_NOTE)
     print("\ncommand:")
     print("  " + " ".join(_shellish(c) for c in cmd))
 

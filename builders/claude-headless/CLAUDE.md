@@ -49,6 +49,20 @@ The `claude -p` flags live in `run_headless.py` and **drift**. Confirm them agai
 [headless guide](https://code.claude.com/docs/en/headless.md)) and update `run_headless.py` if
 anything changed. One file holds the flags on purpose.
 
+## Prompt caching — the CLI's job, not the charter's
+
+This runner shells out to `claude -p`, and the CLI builds the actual API request, so **prompt caching
+is automatic and there is no flag to set**. Don't add one, and don't claim the charter controls it —
+`--dry-run` prints the honest line.
+
+What a charter *does* control is **prefix hygiene**. The system prompt is exactly
+`context.trusted_sources` concatenated in charter order and passed via
+`--append-system-prompt-file`; never interpolate a date, run id, uuid, or cwd into it. Caching is a
+prefix match, so one volatile byte changes the prefix every run and silently stops the CLI's caching
+from paying off — with no error and no counter here to notice it.
+`tests/test_prompt_cache_hygiene.py` locks this. Per-run values belong in the prompt (the user
+message), not the system prompt. Fuller note: [`../langchain/CLAUDE.md`](../langchain/CLAUDE.md).
+
 ## Where to look
 - **Fields (source of truth):** `../../core/charter.schema.yaml`.
 - **The why (doctrine):** [`../../framework/README.md`](../../framework/README.md).

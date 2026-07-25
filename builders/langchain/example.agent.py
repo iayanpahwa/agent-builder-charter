@@ -75,6 +75,22 @@ _PRICE_PER_MTOK = {
     "claude-opus-4-8": {"input": 15.0, "output": 75.0},
 }
 
+# Minimum cacheable prompt PREFIX, in tokens, per model. Prompt caching is a prefix match with a
+# per-model floor: below it the API creates no cache entry AT ALL and says nothing — you just get
+# cache_creation_input_tokens: 0. The floor is not monotonic across generations (512 on the newest
+# models, 4096 on haiku-4-5), so it has to be a table, not a rule of thumb. Used only by
+# caching_note() for the --dry-run diagnostic. Prefix match, like _PRICE_PER_MTOK.
+_CACHE_MIN_TOKENS = {
+    "claude-opus-5": 512,
+    "claude-fable-5": 512,
+    "claude-opus-4-8": 1024,
+    "claude-sonnet-5": 1024,
+    "claude-sonnet-4-6": 1024,
+    "claude-opus-4-7": 2048,
+    "claude-opus-4-6": 4096,
+    "claude-haiku-4-5": 4096,
+}
+
 
 # ============================================================================
 # 2. ENFORCEMENT HELPERS — pure, testable, NO langchain import needed
@@ -228,6 +244,52 @@ def estimate_cost(model_id, in_tok, out_tok):
     if not price:
         return None
     return round((in_tok / 1e6) * price["input"] + (out_tok / 1e6) * price["output"], 6)
+
+
+def caching_note(charter, base_dir):
+    """A --dry-run DIAGNOSTIC (never a wall): would Anthropic prompt caching engage for this agent?
+
+    This builder makes the model call in-process (langchain-anthropic -> anthropic SDK), so unlike
+    the claude-sdk / claude-headless builders — where the `claude` CLI builds the request and caches
+    automatically — caching here is opt-in and currently NOT set. Before wiring `cache_control` up,
+    the prefix has to clear the model's floor, so this line answers that question per agent instead
+    of leaving it to a guess. See builders/langchain/CLAUDE.md.
+
+    The estimate is chars/4 over the trusted_sources prompt only; bound tool schemas add some on top
+    (they render BEFORE system, so they count toward the same prefix). Deliberately conservative: it
+    under-states the prefix, so "would engage" is trustworthy and "would not" is the borderline call.
+    """
+    model_id = (charter.get("model") or {}).get("id") or ""
+    floor = None
+    for k, v in _CACHE_MIN_TOKENS.items():
+        if model_id.startswith(k):
+            floor = v
+            break
+    try:
+        prompt = _read_trusted_sources(charter, base_dir) or ""
+    except ValueError:
+        return (
+            "caching: not set (no cache_control). Prefix unmeasurable — a trusted_source is "
+            "missing or escapes the agent dir, which fails the run closed anyway."
+        )
+    est = len(prompt) // 4
+    if floor is None:
+        return (
+            f"caching: not set (no cache_control). Stable prefix ~{est} tok (system prompt; tools "
+            f"add more); no floor on record for model {model_id!r} — check the prompt-caching docs "
+            "for its minimum cacheable prefix before wiring caching up."
+        )
+    if est < floor:
+        return (
+            f"caching: not set, and would NOT engage — stable prefix ~{est} tok is under the "
+            f"{model_id} floor of {floor} tok, so the API would create no cache entry (silently). "
+            "Nothing to do until the prompt grows past the floor."
+        )
+    return (
+        f"caching: not set, but WOULD engage — stable prefix ~{est} tok clears the {model_id} floor "
+        f"of {floor} tok. Worth wiring cache_control + cache-aware cost accounting; see "
+        "builders/langchain/CLAUDE.md."
+    )
 
 
 def redact(text, patterns, secret_values):
@@ -663,6 +725,7 @@ def enforcement_report(charter):
             f"billing: provider '{prov}' — bills that provider's account per token; "
             "budget.usd is a local estimate, not a metered cap."
         )
+    lines.append(caching_note(charter, HERE))
     lines.append("\n[dry-run] not executed.")
     return "\n".join(lines)
 

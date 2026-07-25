@@ -63,6 +63,30 @@ point, so this builder defaults to the minimal harness and treats Deep Agents as
 re-confirmed opt-in (recorded under `extensions`, declared, never enforced). It is not yet wired;
 do not reach for it as a convenience.
 
+## Prompt caching — measured per agent, not switched on by default
+
+Caching is a **prefix match with a per-model floor**: below the floor the API creates no cache entry
+at all and tells you nothing (`cache_creation_input_tokens: 0`). This builder is the only one where
+caching is ours to control — it calls the model in-process via `langchain-anthropic`, so nothing
+caches unless we set `cache_control`. (The `claude-sdk` and `claude-headless` builders shell out to
+the `claude` CLI, which builds the request and caches automatically; there is nothing to enable
+there, and `ClaudeAgentOptions` exposes no `cache_control`.)
+
+**Today this builder sets no `cache_control`, deliberately.** The reference agent's stable prefix is
+~330 tokens against `claude-haiku-4-5`'s floor of **4096** — roughly ten times too small, so the
+marker would be dead code. `--dry-run` prints the measurement (`caching: …`) so the decision is a
+per-agent fact instead of a guess. Don't wire caching up because it sounds like a win; wire it up
+when that line says `WOULD engage`. When it does, three things land **together** — a `cache_control`
+bind on the model, a cache-aware `estimate_cost` (LangChain's `usage_metadata["input_tokens"]` is
+the *sum* including `cache_read`, so pricing all of it at the input rate over-charges once caching
+is on), and `cache_read`/`cache_creation` in `runs.jsonl` so a run can prove caching worked.
+
+**The hygiene rule applies to every builder, including the automatic ones.** The system prompt is
+exactly `context.trusted_sources` concatenated in charter order — never interpolate a date, run id,
+uuid, or cwd into it. One volatile byte changes the prefix every run and silently kills caching,
+including the CLI's. `tests/test_prompt_cache_hygiene.py` locks this for all three builders; per-run
+values belong in the user message.
+
 ## Where to look
 - **Fields (source of truth):** `../../core/charter.schema.yaml`.
 - **The why (doctrine):** [`../../framework/README.md`](../../framework/README.md).
