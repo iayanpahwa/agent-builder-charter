@@ -161,8 +161,15 @@ builders/langchain/agents/<id>/
 │   └── task.md        # the default task it runs each time
 ├── evals/cases.yaml   # optional — runnable invariants
 ├── requirements.txt   # langgraph + langchain + langchain-anthropic (pinned vs live docs)
+├── requirements.lock  # hash-pinned, generated from it (below)
+├── .venv/             # written by core/provision.py (gitignored, per-machine)
+├── run                # written by core/provision.py (gitignored, per-machine) — the entry point
 └── logs/              # created on first run (gitignored)
 ```
+
+You write everything above `.venv/`; **`core/provision.py` writes `.venv/` and `run`** in step 4
+of *Validate and finish*. Do not hand-write a launcher — a hand-written one resolves `python3`
+off the caller's PATH and needs a venv activated first, which is exactly what breaks under cron.
 
 Generate `agent.py` in the exact shape of `builders/langchain/example.agent.py` — study that file
 directly, it is the reference artifact:
@@ -219,9 +226,56 @@ compare against the reference it came from.
    `python3 builders/langchain/agents/<id>/agent.py --dry-run` → walk the honest
    block/declared/none report, including the soft `budget.usd` and the third-party-tool egress
    caveat.
-4. Offer to run it once — needs `pip install -r builders/langchain/agents/<id>/requirements.txt`
-   and `ANTHROPIC_API_KEY` set — `./builders/langchain/agents/<id>/agent.py manual`. For deeper
-   repeatable evals, mention the standalone gen-evals skill. A human still confirms any factual
-   claim.
-5. To change anything, re-run the new-agent interview (or re-run this generator against the edited
+4. **Lock the dependencies.** `requirements.txt` carries version floors, so the same charter
+   would resolve to a different agent six months from now. Turn it into an exact, hash-pinned
+   lock — `--universal` keeps one lock valid on both macOS and Linux:
+   ```
+   uv pip compile --universal --generate-hashes --no-header \
+     builders/langchain/agents/<id>/requirements.txt \
+     -o builders/langchain/agents/<id>/requirements.lock
+   ```
+   Commit both: the `.txt` records intent, the `.lock` is what actually gets installed.
+   If `uv` is not on PATH, say so plainly and skip this — provisioning falls back to the floors
+   and the agent still runs, it is just not reproducible.
+5. **Offer to provision it**, and run it for them if they agree — this is the only setup step,
+   it is idempotent, and without it there is nothing to run:
+   `python3 core/provision.py builders/langchain/agents/<id>`
+   It builds `agents/<id>/.venv` from the pinned deps and writes `agents/<id>/run`. Nothing is
+   installed outside the agent's own directory, and the run path never reaches a package index
+   again — a runner that installed at invocation time would be an undeclared egress path, which
+   is the thing a charter exists to prevent. Say what it did in one line; don't paste its output.
+6. Offer to run it once — `./builders/langchain/agents/<id>/run` — needs `ANTHROPIC_API_KEY` set.
+   For deeper repeatable evals, mention the standalone gen-evals skill. A human still confirms
+   any factual claim.
+7. To change anything, re-run the new-agent interview (or re-run this generator against the edited
    `brief.yaml`) — never hand-edit `charter.yaml` or `agent.py`.
+
+## Hand it over
+Close with exactly this, `<id>` filled in. It is the last thing the creator reads, so it has to
+stand on its own — do not compress it into prose or drop the log paths.
+
+```
+Your agent is ready: <id>
+
+  Run it
+      ./builders/langchain/agents/<id>/run
+      ./builders/langchain/agents/<id>/run --dry-run   # what's enforced; no tokens spent
+
+  Read what it produced          (logs/ appears after the first real run)
+      builders/langchain/agents/<id>/logs/runs.jsonl
+          one line per run: outcome, cost, duration, eval pass/fail, output file
+      builders/langchain/agents/<id>/logs/<timestamp>.output.txt
+          the agent's full response, after redaction
+      builders/langchain/agents/<id>/logs/<timestamp>.trace.jsonl
+          per-tool-call trace, when extensions.observability.trace is on
+
+  Latest output, any time
+      ls -t builders/langchain/agents/<id>/logs/*.output.txt | head -1 | xargs cat
+
+  Change anything
+      re-run /new-agent — never hand-edit charter.yaml or agent.py
+```
+
+If they declined provisioning, keep the block but replace the first command with
+`python3 core/provision.py builders/langchain/agents/<id>`, and say plainly that `run` does not
+exist until they do that.

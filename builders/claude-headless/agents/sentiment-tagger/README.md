@@ -5,9 +5,13 @@ Text-only (no tools), runs headless via `claude -p`, enforced by its charter.
 
 ## Run it
 ```bash
-cd builders/claude-headless/agents/sentiment-tagger
-./run.sh manual
+# once per machine — builds this agent's own .venv and writes its `run`
+python3 core/provision.py builders/claude-headless/agents/sentiment-tagger
+
+builders/claude-headless/agents/sentiment-tagger/run manual
 ```
+`run` bakes in absolute paths and activates nothing, so it works from any directory and
+under cron without setup. It is per-machine and gitignored; provision on each host.
 This runs the agent headless (model, turns, and timeout enforced from `charter.yaml`),
 then checks its output against `evals/cases.yaml`. If the invariant passes, the run is
 logged as complete; otherwise failed. Every run appends to `logs/runs.jsonl`

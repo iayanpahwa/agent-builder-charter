@@ -137,15 +137,18 @@ cd agent-builder-charter   # or wherever you cloned it
    generator — for headless, **create-headless-agent** — which re-confirms the concretized
    safety values (exact model id, tool names, egress hosts), writes a self-contained project at
    `builders/claude-headless/agents/<id>/` (the brief, charter, prompts, optional evals, and
-   `run.sh`), and validates it.
+   `run`), and validates it.
 
 ```bash
 # 4. See what's REALLY enforced (no tokens spent)
 python3 builders/claude-headless/run_headless.py \
   --charter builders/claude-headless/agents/<id>/charter.yaml --dry-run
 
-# 5. Run it, headless, enforced, eval-gated, logged
-./builders/claude-headless/agents/<id>/run.sh manual
+# 5. Provision it — once per machine. Builds the agent's own .venv and writes its `run`.
+python3 core/provision.py builders/claude-headless/agents/<id>
+
+# 6. Run it, headless, enforced, eval-gated, logged
+./builders/claude-headless/agents/<id>/run manual
 ```
 
 Prefer to see the ideas first? `python3 core/loader.py` (per-run enforcement) and
@@ -153,27 +156,28 @@ Prefer to see the ideas first? `python3 core/loader.py` (per-run enforcement) an
 
 ## Build for the SDK or LangChain runtime
 
-The interview is identical; pick a different runtime and you get a different artifact. Both the
+The interview is identical; pick a different runtime and you get a different artifact. The
 `claude-sdk` and `langchain` runtimes ship a single self-contained `agent.py` with the charter
-embedded (no `run.sh` wrapper), so you run the file directly.
+embedded, rather than headless's `claude -p` command — but you provision and run all three the
+same way.
 
 **`claude-sdk`** — the Claude Agent SDK (Claude Code as a library). Project lands at
 `builders/claude-sdk/agents/<id>/`:
 
 ```bash
-python3 builders/claude-sdk/agents/<id>/agent.py --dry-run     # what's REALLY enforced, no tokens
-pip install -r builders/claude-sdk/agents/<id>/requirements.txt   # + the `claude` CLI on PATH, authed
-./builders/claude-sdk/agents/<id>/agent.py manual
+python3 core/provision.py builders/claude-sdk/agents/<id>   # once; also resolves the `claude` CLI
+./builders/claude-sdk/agents/<id>/run --dry-run             # what's REALLY enforced, no tokens
+./builders/claude-sdk/agents/<id>/run
 ```
 
 **`langchain`** — the LangGraph minimal harness (`create_agent`). Project lands at
 `builders/langchain/agents/<id>/`:
 
 ```bash
-pip install -r builders/langchain/agents/<id>/requirements.txt    # langgraph + langchain + langchain-anthropic
 export ANTHROPIC_API_KEY=sk-...
-python3 builders/langchain/agents/<id>/agent.py --dry-run
-./builders/langchain/agents/<id>/agent.py manual
+python3 core/provision.py builders/langchain/agents/<id>    # once
+./builders/langchain/agents/<id>/run --dry-run
+./builders/langchain/agents/<id>/run
 ```
 
 The langchain agent's tools come from a vetted, guarded catalog: `fetch_url` (host-checked
@@ -183,51 +187,85 @@ against `egress`) plus path-jailed `read_file` / `list_dir` / `grep` / `write_fi
 
 ## Running an agent
 
-Once the agent exists under `agents/<id>/`, everything goes through its `run.sh`, so the
-charter is enforced and every run is logged the same way, no matter what kicks it off. Three
-ways to run it:
+Once the agent exists under `agents/<id>/`, provision it once on that machine —
+`python3 core/provision.py <agent-dir>` — which builds the agent's own `.venv` and writes its
+`run`. After that everything goes through `run`, so the charter is enforced and every run is
+logged the same way, no matter what kicks it off.
+
+`run` is generated with absolute paths and activates nothing, so it behaves identically from
+any directory, from cron, and from launchd. It installs nothing: provisioning is the only step
+that touches a package index, which is what keeps the charter's `egress` the whole network
+story. Change the pinned dependencies and it refuses (exit 7) rather than run a stale venv.
+
+What gets installed comes from a `requirements.lock` — exact versions with hashes, resolved
+`--universal` so one lock covers macOS and Linux. That is what makes an agent reproducible:
+without it, version floors like `langgraph>=0.2` mean the same charter builds a different agent
+six months from now. Provisioning prefers the agent's own lock, then the builder's, and falls
+back to unpinned floors only if neither exists.
+
+Three ways to run it:
 
 **Directly, by hand:**
 
 ```bash
-./agents/<id>/run.sh manual
+./agents/<id>/run manual
 ```
 
-The word after `run.sh` is just a trigger label written to the log (`manual`, `cron`,
-`webhook`, whatever says *why* it ran). It runs the agent headless, gates on the evals, and
-appends a line to `agents/<id>/logs/runs.jsonl`.
+The word after `run` is just a trigger label written to the log (`manual`, `cron`,
+`webhook`, whatever says *why* it ran). It runs the agent under its charter, gates on the evals,
+saves the output to `agents/<id>/logs/<timestamp>.output.txt`, and appends a line to
+`agents/<id>/logs/runs.jsonl`. Add `--dry-run` to see what's enforced without spending tokens.
 
 **Ask Claude Code to run it:** with the repo open in Claude Code, say *"run the `<id>` agent
-and show me the result."* It runs the same `run.sh`, then reads back the output, the eval
+and show me the result."* It runs the same `run`, then reads back the output, the eval
 outcome (complete / failed), and the cost, so you don't have to dig through the log yourself.
 
-**On a schedule (cron):** `run.sh` is just a command, so any scheduler works. `run.sh` resolves
+**On a schedule (cron):** `run` is just a command, so any scheduler works. `run` resolves
 its own paths, so it runs correctly from anywhere. To run an agent every morning at 8,
 `crontab -e` and add:
 
 ```cron
-0 8 * * *  /abs/path/to/builders/claude-headless/agents/<id>/run.sh cron >> /tmp/<id>.log 2>&1
+0 8 * * *  /abs/path/to/builders/claude-headless/agents/<id>/run cron >> /tmp/<id>.log 2>&1
 ```
 
 Use the `cron` trigger label so scheduled runs are easy to spot in the log. The same one line
 works under launchd, a systemd timer, a CI cron, or any orchestrator; they all just call
-`run.sh`.
+`run`.
 
-**`claude-sdk` agents run the same way, minus the wrapper.** There the artifact is a single
-`agent.py` (the charter is embedded in it), so you run it directly — `./agents/<id>/agent.py
-manual`, or `python3 agents/<id>/agent.py cron` from a scheduler — with the same trigger-label
-and `runs.jsonl` convention. It also takes `--stream` (echo the loop live) and `--trace` (write a
-per-run tool-call trace). Two scheduler notes specific to the SDK: the job needs the agent's auth
-env var (`ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN`) and the `claude` CLI on its `PATH`.
-See [`builders/claude-sdk/GUIDE.md`](builders/claude-sdk/GUIDE.md).
-
-**`langchain` agents run the same single-file way.** The artifact is an `agent.py` on the
-LangGraph minimal harness with the charter embedded; run it directly (`./agents/<id>/agent.py
-manual`) or `python3 agents/<id>/agent.py cron`, same trigger-label and `runs.jsonl` convention.
-Its scheduler notes: the job needs `ANTHROPIC_API_KEY` and the langchain deps installed (no
-`claude` CLI required). Tools come from a guarded catalog (`fetch_url` plus path-jailed
-`read_file` / `list_dir` / `grep` / `write_file`). See
+**All three runtimes work exactly this way.** Provision, then `run` — same two commands whether
+the artifact underneath is a `claude -p` command (headless) or a self-contained `agent.py`
+(`claude-sdk`, `langchain`). The trigger label, `runs.jsonl`, the saved output, and the exit
+codes are identical. `claude-sdk` and `langchain` additionally accept `--stream` (echo the loop
+live) and `--trace` (write a per-run tool-call trace). See
+[`builders/claude-sdk/GUIDE.md`](builders/claude-sdk/GUIDE.md) and
 [`builders/langchain/GUIDE.md`](builders/langchain/GUIDE.md).
+
+### One run at a time
+
+Each agent takes an advisory lock on `<agent-dir>/.run.lock` before it spends anything. A second
+run that finds it held prints `REFUSED`, logs the attempt, and exits `8` without reaching a
+model — so a schedule that fires faster than a run finishes backs off instead of quietly putting
+two runs on one budget, one log, and one output directory. The lock is kernel-owned, so it is
+released even if a run is `SIGKILL`ed; nothing to clean up by hand.
+
+### Exit codes
+
+The whole point of a scheduled agent is that nobody is watching, so the exit code is the alert.
+
+| code | meaning |
+|---|---|
+| `0` | complete — ran, and passed its evals if it has any |
+| `1` | failed — ran, but an eval invariant failed |
+| `2` | refused — untrusted source, or a tool the charter can't grant |
+| `3` | refused — `status` is not `enabled` |
+| `4` | refused — no task prompt |
+| `5` | killed — wall-clock timeout or step cap; nothing completed |
+| `6` | dependencies missing (shouldn't happen after provisioning) |
+| `7` | dependencies changed since provisioning — re-provision |
+| `8` | refused — another run of this agent is in progress |
+
+Anything non-zero deserves a look. `5` in particular is a run that produced nothing: with
+`MAILTO` set, or any wrapper that checks `$?`, it will reach you.
 
 ## How it works: the spine
 

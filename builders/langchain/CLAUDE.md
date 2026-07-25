@@ -42,7 +42,10 @@ When a user says "help me build a <thing> agent":
 2. **Validate:** `python3 ../../core/validate.py agents/<id>/charter.yaml` → loop to `VALID`.
 3. **Show the honest report** (no tokens): `python3 agents/<id>/agent.py --dry-run` — walk each
    field: `block` / `declared` / `none` (and `—` for a field you didn't set).
-4. **Run it:** `./agents/<id>/agent.py manual` — pins the model, binds only your tools, enforces
+4. **Provision it** (once per machine): `python3 ../../core/provision.py agents/<id>` — builds
+   `agents/<id>/.venv` from the pinned deps and writes `agents/<id>/run`. Nothing is installed
+   outside the agent's directory, and the run path never reaches a package index again.
+5. **Run it:** `./agents/<id>/run` — pins the model, binds only your tools, enforces
    steps/timeout, gates on evals if any, logs to `agents/<id>/logs/runs.jsonl`.
 
 ## Keep the harness current

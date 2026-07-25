@@ -20,12 +20,14 @@ questions (never silently deciding model, budget, capabilities, or network), and
 plug-in round (extra `.md` files, MCP servers, skills). It captures a **brief** and hands off
 to **create-headless-agent** (this builder's generator), which re-confirms the concretized
 safety values and generates a self-contained project at `agents/<id>/` here: the `brief.yaml`,
-charter, `prompts/`, optional `evals/`, and `run.sh` (the artifact). It validates the charter.
+charter, `prompts/`, and optional `evals/`. It validates the charter.
 
 Then, from this folder:
 - See what's really enforced (no tokens):
   `python3 run_headless.py --charter agents/<id>/charter.yaml --dry-run`
-- Run it: `./agents/<id>/run.sh manual` — headless (enforced), gates on evals, marks the run
+- Provision it once per machine: `python3 ../../core/provision.py agents/<id>` — builds the
+  agent's own `.venv`, resolves the `claude` binary, and writes `agents/<id>/run` (the artifact).
+- Run it: `./agents/<id>/run manual` — headless (enforced), gates on evals, marks the run
   complete or failed, and logs it.
 
 Want to see the ideas first? `python3 ../../core/loader.py` (enforcement) and
@@ -59,7 +61,7 @@ builder-local **run-evals** helper lives here.
              create-headless-agent generator turns it into the agent project (never by hand)
 2. VALIDATE  ../../core/validate.py checks the charter (fail closed)
 3. REPORT    run_headless.py --dry-run prints, honestly, what each field really enforces
-4. RUN       run.sh -> run_headless.py IS the door: model / tools / turns / timeout / egress enforced
+4. RUN       run -> run_headless.py IS the door: model / tools / turns / timeout / egress enforced
 5. GATE      if evals opted in, the output is checked against invariants -> complete / failed
 6. LOG       every run appends to agents/<id>/logs/runs.jsonl (name · timestamp · trigger · outcome · cost)
 ```

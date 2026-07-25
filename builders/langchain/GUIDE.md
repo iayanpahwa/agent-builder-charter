@@ -10,8 +10,8 @@ minimal agent harness — so the limits are enforced in-process, not just descri
 
 ## Before you start
 - **Claude Code** (to run the interview).
-- **Python 3** + `pip install -r requirements.txt` (`langgraph`, `langchain`,
-  `langchain-anthropic`; pinned in the generated `requirements.txt`).
+- **Python 3**. You don't install `langgraph` / `langchain` / `langchain-anthropic` yourself —
+  `core/provision.py` puts them in a `.venv` inside the agent's own directory (step 5).
 - **`ANTHROPIC_API_KEY`** in your environment — the provider key the charter declares. It bills
   your Anthropic API account per token.
 - Open the **repo root** in Claude Code (the interview lives there); your agent lands in this
@@ -56,9 +56,9 @@ third-party tool you add reaches the network outside the `fetch_url` egress guar
 
 ## Step 5 — run it
 ```bash
-pip install -r agents/<id>/requirements.txt
 export ANTHROPIC_API_KEY=sk-...
-./agents/<id>/agent.py manual
+python3 ../../core/provision.py agents/<id>   # once per machine
+./agents/<id>/run
 ```
 It pins the model, binds only your tools, runs under the step + wall-clock ceilings, gates on your
 evals if any, marks the run complete/failed/killed, and appends a line to `agents/<id>/logs/runs.jsonl`.

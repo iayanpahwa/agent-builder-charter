@@ -2,22 +2,22 @@
 name: run-evals
 description: >
   Run or re-run a headless agent's eval cases against its output, or check a sample output
-  ad-hoc without a live run. For headless agents the eval gate is built into run.sh
-  (`--eval`); this skill covers running it, interpreting the log, checking a pasted output
+  ad-hoc without a live run. For headless agents the eval gate is built into the agent's
+  `run` shim (`--eval`); this skill covers running it, interpreting the log, checking a pasted output
   cheaply, and escalating to gen-evals for repeatable independent evals. Use for "run/check
   evals for <agent>", "did it pass its evals", or after changing a prompt/model.
 ---
 
 # run-evals
 
-For a **headless** agent the eval gate lives in the run itself: `./run.sh` (which calls
+For a **headless** agent the eval gate lives in the run itself: `./run` (which calls
 `run_headless.py --eval`) runs the agent, checks its output against `agents/<id>/evals/cases.yaml`
 deterministic invariants, marks the run **complete** or **failed**, and logs it. This skill
 helps you run that, read the result, or check output without spending tokens.
 
 ## Run / re-run the gate (a few cheap tokens)
 ```bash
-./agents/<id>/run.sh manual
+./agents/<id>/run manual
 ```
 Then read `agents/<id>/logs/runs.jsonl` — the latest entry's `outcome` is `complete` (all
 invariants passed) or `failed` (the entry lists which invariant failed and why). Re-run after

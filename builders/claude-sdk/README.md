@@ -25,13 +25,15 @@ generates a self-contained project at `agents/<id>/` here: `brief.yaml`, `charte
 `agent.py` (the artifact — the charter embedded in it), `prompts/`, optional `evals/`, and
 `requirements.txt`.
 
-Then, from this folder:
+Then provision it once per machine, from the repo root:
 ```bash
-pip install -r agents/<id>/requirements.txt   # also needs the `claude` CLI (Node) on PATH + auth
+python3 core/provision.py builders/claude-sdk/agents/<id>   # also resolves the `claude` CLI
 ```
-- See what's really enforced (no tokens): `python3 agents/<id>/agent.py --dry-run`
-- Run it: `./agents/<id>/agent.py manual` — or `python3 agents/<id>/agent.py cron` from a
-  scheduler. No `run.sh` wrapper: the artifact IS the runnable file.
+That builds `agents/<id>/.venv` (nothing is installed outside the agent's own directory) and
+writes `agents/<id>/run`.
+- See what's really enforced (no tokens): `./agents/<id>/run --dry-run`
+- Run it: `./agents/<id>/run` — or `./agents/<id>/run cron` from a scheduler. The shim resolves
+  every path absolutely and activates nothing, so a manual run and a cron run take the same path.
 
 ## New here? Read `GUIDE.md`
 
@@ -100,6 +102,6 @@ Both are redacted like the saved output. Authority-expanding SDK features (subag
 ## vs. headless
 Same charter, same walls, same honesty. The difference is the shape of the artifact: the SDK
 agent is a portable, single-file Python program (`agent.py`) you can run in-process, embed in
-another app, or drop into CI; headless is a `claude -p` command behind `run.sh`. Pick whichever
+another app, or drop into CI; headless is a `claude -p` command behind the same `run` shim. Pick whichever
 shape fits where the agent needs to live. The doctrine (the *why*, the honest limits that hold
 across every runtime) is one page: [`../../framework/README.md`](../../framework/README.md).

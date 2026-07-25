@@ -3,7 +3,7 @@
 This folder is the **claude-headless builder** — one builder in the CHARTER repo. It turns a
 charter into an agent that runs **headless** (`claude -p`), the tier where the charter is
 really enforced (you control the process: model, tools, turns, timeout, network, environment).
-You (Claude Code) run the **interview** here; the artifact you hand back is a runnable `run.sh`.
+You (Claude Code) run the **interview** here; the artifact you hand back is a runnable `run`.
 
 The shared, runtime-neutral engine (schema, validators, eval checks, doctrine reference) lives
 in **`../../core/`**; the one-page doctrine in **`../../framework/`**. This builder only adds
@@ -35,12 +35,15 @@ When a user says "help me build a <thing> agent":
    (extra `.md`, MCP servers, skills), captures a **brief**, and hands off to the
    **`create-headless-agent`** generator, which re-confirms the concretized safety values and
    generates a self-contained project at `agents/<id>/` (`brief.yaml`, `charter.yaml`,
-   `prompts/`, optional `evals/`, `run.sh`).
+   `prompts/`, optional `evals/`, `run`).
 2. **Validate:** `python3 ../../core/validate.py agents/<id>/charter.yaml` → loop to `VALID`.
 3. **Show the honest report** (no tokens):
    `python3 run_headless.py --charter agents/<id>/charter.yaml --dry-run`
    — walk each field: `block` / `declared` / `none` (and `—` for a field you didn't set).
-4. **Run it:** `./agents/<id>/run.sh manual` — runs headless (model/tools/turns/timeout enforced),
+4. **Provision it** (once per machine): `python3 ../../core/provision.py agents/<id>` — builds
+   `agents/<id>/.venv` from the pinned deps, resolves the `claude` binary, and writes
+   `agents/<id>/run`. Nothing is installed outside the agent's directory.
+5. **Run it:** `./agents/<id>/run manual` — runs headless (model/tools/turns/timeout enforced),
    gates on evals if any, marks the run complete/failed, logs to `agents/<id>/logs/runs.jsonl`.
 
 ## Keep the headless command current

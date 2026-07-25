@@ -39,14 +39,16 @@ generates a self-contained project at `agents/<id>/` here: `brief.yaml`, `charte
 `agent.py` (the artifact — the charter embedded in it), `prompts/`, optional `evals/`, and
 `requirements.txt`.
 
-Then, from this folder:
+Then provision it once per machine, from the repo root:
 ```bash
-pip install -r agents/<id>/requirements.txt   # langgraph + langchain + langchain-anthropic
+python3 core/provision.py builders/langchain/agents/<id>
 export ANTHROPIC_API_KEY=sk-...               # the provider key the charter declares
 ```
-- See what's really enforced (no tokens): `python3 agents/<id>/agent.py --dry-run`
-- Run it: `./agents/<id>/agent.py manual` — or `python3 agents/<id>/agent.py cron` from a
-  scheduler. No `run.sh` wrapper: the artifact IS the runnable file.
+That builds `agents/<id>/.venv` (nothing is installed outside the agent's own directory) and
+writes `agents/<id>/run`.
+- See what's really enforced (no tokens): `./agents/<id>/run --dry-run`
+- Run it: `./agents/<id>/run` — or `./agents/<id>/run cron` from a scheduler. The shim resolves
+  every path absolutely and activates nothing, so a manual run and a cron run take the same path.
 
 ## New here? Read `GUIDE.md`
 

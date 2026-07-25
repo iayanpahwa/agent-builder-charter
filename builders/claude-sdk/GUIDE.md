@@ -11,7 +11,8 @@ just described.
 
 ## Before you start
 - **Claude Code** (to run the interview).
-- **Python 3** + `pip install claude-agent-sdk` (pinned in the generated `requirements.txt`).
+- **Python 3**. You don't install `claude-agent-sdk` yourself — `core/provision.py` puts it in
+  a `.venv` inside the agent's own directory (step 5).
 - The **`claude` CLI** (Node) on your PATH, authenticated — the Python SDK shells out to it;
   unlike the TypeScript SDK, it does not bundle the binary.
 - The auth env var for whichever mode you pick in the interview: `ANTHROPIC_API_KEY` (api-key
@@ -66,8 +67,8 @@ real sandbox needs a container).
 
 ## Step 5 — Run it
 ```bash
-pip install -r builders/claude-sdk/agents/<name>/requirements.txt
-./builders/claude-sdk/agents/<name>/agent.py manual        # or: python3 agent.py cron
+python3 core/provision.py builders/claude-sdk/agents/<name>   # once per machine
+./builders/claude-sdk/agents/<name>/run                       # or: ./run cron
 ```
 This runs the agent **in-process on the Claude Agent SDK**, enforced by its embedded charter
 (pinned model, only its tools, a hard turn limit, a wall-clock timeout, egress via a

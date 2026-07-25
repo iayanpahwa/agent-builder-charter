@@ -2,7 +2,7 @@
 name: create-headless-agent
 description: >
   Turn a framework-neutral agent brief into a CHARTER-governed HEADLESS agent project — a
-  self-contained dir whose artifact is a runnable run.sh (`claude -p`), plus its charter,
+  self-contained dir whose artifact is a runnable run (`claude -p`), plus its charter,
   prompts, optional evals, and logging. Invoked by the new-agent interview after the creator
   picks the headless runtime (or run standalone against an existing agents/<id>/brief.yaml).
 ---
@@ -11,7 +11,7 @@ description: >
 
 You receive a framework-neutral **brief** (from the new-agent interview) and turn it into a
 self-contained **headless agent project** under `builders/claude-headless/agents/<id>/`. The
-headline artifact is `run.sh` — a terminal command that runs the agent via `claude -p`,
+headline artifact is `run` — a terminal command that runs the agent via `claude -p`,
 enforced by its charter, gated by its evals, and logged.
 
 ## First: write the brief to disk
@@ -59,21 +59,18 @@ builders/claude-headless/agents/<id>/
 │   ├── system.md      # REAL instructions (role, how-to-work, never-do, format, a good/bad example)
 │   └── task.md        # the default task it runs each time
 ├── evals/cases.yaml   # optional — runnable invariants
-├── run.sh             # THE ARTIFACT (below); chmod +x it
 └── README.md          # what it is, how to run, what's really enforced
 ```
 
-`run.sh` calls the shared headless loader — do not inline the flags (they live in one place so
-every agent stays current):
-```bash
-#!/bin/bash
-set -euo pipefail
-here="$(cd "$(dirname "$0")" && pwd)"
-exec python3 "$here/../../run_headless.py" \
-  --charter "$here/charter.yaml" --trigger "${1:-manual}" --eval
-```
-Include `--eval` only if the creator opted into evals; write `charter.yaml` in the field order
-of `builders/claude-headless/examples/repo-researcher.charter.yaml`.
+**You do not write the runner.** `core/provision.py` generates `agents/<id>/run` (and
+`agents/<id>/.venv`) in step 4 of *Validate and finish*, with absolute paths baked in so the
+same command works from any directory and under cron. Do not hand-write a `run` or `run.sh` —
+a hand-written one resolves `python3` and `claude` off the caller's PATH, which is exactly what
+breaks the moment a scheduler runs it. The shim always passes `--eval`; the gate is a no-op when
+`evals/cases.yaml` is absent, so evals stay optional without a second code path.
+
+Write `charter.yaml` in the field order of
+`builders/claude-headless/examples/repo-researcher.charter.yaml`.
 
 ### cases.yaml (if evals opted in) — runnable, so run_headless can gate on it
 Turn Q10 answers into deterministic invariants (vocabulary: `contains` / `not_contains` /
@@ -111,8 +108,47 @@ in one file on purpose: fix it once, every agent stays current.
 2. Read the SAFETY fields back in plain English (model + why, budget, tools, egress).
 3. Dry-run (prints the command + the honest enforcement report, no tokens):
    `python3 builders/claude-headless/run_headless.py --charter builders/claude-headless/agents/<id>/charter.yaml --dry-run`.
-4. Offer to run it once — `./builders/claude-headless/agents/<id>/run.sh manual` — a few cheap
+4. **No per-agent dependency lock here.** Headless agents have no Python deps of their own —
+   the runtime is `run_headless.py`, whose deps are the repo's, already hash-pinned in
+   `requirements.lock` at the repo root. Don't generate one; provisioning picks that up.
+5. **Offer to provision it**, and run it for them if they agree — this is the only setup step,
+   it is idempotent, and without it there is nothing to run:
+   `python3 core/provision.py builders/claude-headless/agents/<id>`
+   It builds `agents/<id>/.venv` from the pinned deps, resolves and verifies the `claude` binary
+   (which cron will not find on PATH), and writes `agents/<id>/run`. Nothing is installed outside
+   the agent's own directory, and the run path never reaches a package index again — a runner
+   that installed at invocation time would be an undeclared egress path, which is the thing a
+   charter exists to prevent. Say what it did in one line; don't paste its output.
+6. Offer to run it once — `./builders/claude-headless/agents/<id>/run manual` — a few cheap
    cents, opt-in; for deeper repeatable independent evals, mention the standalone **gen-evals**
    skill. A human still confirms any factual claim.
-5. To change anything, re-run the new-agent interview (or re-run this generator against the
+7. To change anything, re-run the new-agent interview (or re-run this generator against the
    edited `brief.yaml`) — never hand-edit `charter.yaml`.
+
+## Hand it over
+Close with exactly this, `<id>` filled in. It is the last thing the creator reads, so it has to
+stand on its own — do not compress it into prose or drop the log paths.
+
+```
+Your agent is ready: <id>
+
+  Run it
+      ./builders/claude-headless/agents/<id>/run
+      ./builders/claude-headless/agents/<id>/run --dry-run   # what's enforced; no tokens spent
+
+  Read what it produced          (logs/ appears after the first real run)
+      builders/claude-headless/agents/<id>/logs/runs.jsonl
+          one line per run: outcome, cost, duration, eval pass/fail, output file
+      builders/claude-headless/agents/<id>/logs/<timestamp>.output.txt
+          the agent's full response, after redaction
+
+  Latest output, any time
+      ls -t builders/claude-headless/agents/<id>/logs/*.output.txt | head -1 | xargs cat
+
+  Change anything
+      re-run /new-agent — never hand-edit charter.yaml
+```
+
+If they declined provisioning, keep the block but replace the first command with
+`python3 core/provision.py builders/claude-headless/agents/<id>`, and say plainly that `run` does
+not exist until they do that.

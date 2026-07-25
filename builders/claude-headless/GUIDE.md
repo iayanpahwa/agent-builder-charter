@@ -10,7 +10,8 @@ runner reads that rulebook and blocks anything not on it. The agent runs **headl
 
 ## Before you start
 - **Claude Code** (to run the interview) + the **`claude` CLI** on your PATH (to run the agent).
-- **Python 3** + the deps: `pip install -r ../../requirements.txt` (PyYAML + jsonschema).
+- **Python 3**. You don't install the agent's deps yourself — `core/provision.py` puts them in
+  a `.venv` inside the agent's own directory (step 5).
 - Open the **repo root** in Claude Code (the interview lives there); your agent lands in this builder.
 
 ## Step 1 — Make the agent (don't write the rulebook by hand)
@@ -28,7 +29,8 @@ agents/<name>/
 │   ├── system.md        # the agent's instructions
 │   └── task.md          # the job it runs each time
 ├── evals/cases.yaml     # optional — the checks its output must pass
-├── run.sh               # the artifact: the command you run
+├── .venv/               # written by provisioning (per-machine, gitignored)
+├── run                  # written by provisioning: the command you run
 └── README.md
 ```
 
@@ -55,8 +57,11 @@ needs a container).
 
 ## Step 5 — Run it
 ```bash
-./builders/claude-headless/agents/<name>/run.sh manual        # or: cron / webhook / whatever triggered it
+python3 core/provision.py builders/claude-headless/agents/<name>   # once per machine
+./builders/claude-headless/agents/<name>/run manual                # or: cron / webhook / ...
 ```
+Provisioning builds the agent's own `.venv`, resolves the `claude` binary, and writes `run`.
+Nothing is installed outside the agent's directory, and `run` never reaches a package index.
 This runs the agent **headless**, enforced by its charter (pinned model, only its tools,
 a hard turn limit, a wall-clock timeout). If it has evals, the output is checked against
 them: pass → the run is **complete**; fail → **failed** (and it tells you which check failed).
