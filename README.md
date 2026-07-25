@@ -46,7 +46,7 @@ the runtime does the same way for everyone.
 |---|---|---|---|
 | **C** | **Context** | the only sources its instructions are built from, including your own `.md` instruction files | `context.trusted_sources`; everything else it reads is untrusted |
 | **H** | **Harness** | the bounded box it runs in | `model`, `sandbox`, `budget` |
-| **A** | **Authority** | what it may touch: built-in tools plus any custom tools, MCP servers, and skills you plug in | `tools`, `mcp`, `skills`, `credentials`, `egress`, `approval_tier` |
+| **A** | **Authority** | what it may touch: built-in tools plus any custom tools, MCP servers, and skills you plug in | `tools`, `mcp`, `skills`, `credentials`, `egress`, `bash_allow`, `approval_tier` |
 | **R** | **Recovery** | how it fails safely | a runtime behaviour (retry / resume / dead-letter) |
 | **T** | **Telemetry** | what is watched, kept, and logged | `data` (sensitivity, redaction, retention) plus a run log each run (who, when, outcome, cost) |
 | **E** | **Evals** | how you know it works | `evals`: must-pass tests plus a live number that pages the owner |
@@ -133,21 +133,28 @@ cd agent-builder-charter   # or wherever you cloned it
    to build for (`headless`, `claude-sdk`, and `langchain` are built; `openai-agents` is
    planned), then plain questions (it never silently decides your model, budget, capabilities,
    or network), and offers a plug-in round (extra `.md` files, MCP servers, skills).
-3. It captures a **brief** (the neutral chart of your answers) and hands off to the runtime's
+3. **If the agent depends on an external source, the interview fetches it once, by hand, before
+   writing anything** — an actual request for the actual data, and it reads what comes back. A
+   JavaScript shell with no data in it is a failure, not a success. The result is recorded in
+   the brief under `data_source`, and a failure is the most useful thing the step produces: the
+   honest options then are a different source, a narrower purpose, or not building the agent.
+   The order is *prove the source → charter → guardrails → evals*, because everything after the
+   first step is wasted if the data can't be got.
+4. It captures a **brief** (the neutral chart of your answers) and hands off to the runtime's
    generator — for headless, **create-headless-agent** — which re-confirms the concretized
    safety values (exact model id, tool names, egress hosts), writes a self-contained project at
    `builders/claude-headless/agents/<id>/` (the brief, charter, prompts, optional evals, and
    `run`), and validates it.
 
 ```bash
-# 4. See what's REALLY enforced (no tokens spent)
+# 5. See what's REALLY enforced (no tokens spent)
 python3 builders/claude-headless/run_headless.py \
   --charter builders/claude-headless/agents/<id>/charter.yaml --dry-run
 
-# 5. Provision it — once per machine. Builds the agent's own .venv and writes its `run`.
+# 6. Provision it — once per machine. Builds the agent's own .venv and writes its `run`.
 python3 core/provision.py builders/claude-headless/agents/<id>
 
-# 6. Run it, headless, enforced, eval-gated, logged
+# 7. Run it, headless, enforced, eval-gated, logged
 ./builders/claude-headless/agents/<id>/run manual
 ```
 
@@ -259,14 +266,17 @@ The whole point of a scheduled agent is that nobody is watching, so the exit cod
 | `2` | refused — untrusted source, or a tool the charter can't grant |
 | `3` | refused — `status` is not `enabled` |
 | `4` | refused — no task prompt |
-| `5` | killed — wall-clock timeout or step cap; nothing completed |
+| `5` | killed or interrupted — wall clock, step cap, or a signal; nothing completed |
 | `6` | dependencies missing (shouldn't happen after provisioning) |
 | `7` | dependencies changed since provisioning — re-provision |
 | `8` | refused — another run of this agent is in progress |
 | `9` | refused — a credential the charter declares is not set |
 
 Anything non-zero deserves a look. `5` in particular is a run that produced nothing: with
-`MAILTO` set, or any wrapper that checks `$?`, it will reach you.
+`MAILTO` set, or any wrapper that checks `$?`, it will reach you. A killed or interrupted run
+still writes its `runs.jsonl` line and saves whatever partial output it had produced — the two
+causes share an exit code because your response is the same, and the log carries the
+distinction (`outcome: killed` vs `interrupted`), which is where you diagnose it.
 
 ### Credentials are checked before anything is spent
 
@@ -285,6 +295,49 @@ refuse on the `headless` and `claude-sdk` runtimes, because the `claude` CLI can
 from a stored login — the run may well succeed, just not via the credential the charter names,
 and the warning says exactly that. On `langchain` there is no such fallback, so they are
 required like any other.
+
+### Granting `Bash`: `bash_allow`
+
+`Bash` reaches the network without going anywhere near `WebFetch`, so a scoped `egress` never
+contained it — `egress: [api.example.com]` plus `tools: [Bash]` used to describe an agent
+confined to one host and produce an agent that could reach anything. `bash_allow` is what closes
+that, so if you grant `Bash` you declare where it may go:
+
+```yaml
+tools: [Bash]
+egress: [api.example.com]
+bash_allow:
+  - host: api.example.com
+    path: /search
+    methods: [GET]
+```
+
+The runtime then permits exactly one shape — a plain `curl` to a declared endpoint — and denies
+everything else: pipes, redirection, chaining, command substitution, more than one URL, plain
+`http`, an explicit port, redirect-following (`-L`, because the hop can't be checked), and any
+flag that writes a file, disables TLS checks, or routes through a proxy. Host and path are
+matched by parsing the URL, so `https://api.example.com@evil.tld/x` and
+`api.example.com.evil.tld` are both refused. Query strings are unrestricted, so the `&` and `;`
+in a real API call are fine.
+
+Grant `Bash` **without** `bash_allow` and every command is denied — the charter is valid, and
+the agent has a shell it cannot use. That is deliberate: fail closed, and say so in `--dry-run`.
+If you can't name the endpoints, you don't need `Bash`.
+
+This is a narrowing, not a sandbox. It bounds where the agent can reach; the process is still
+unisolated, and that needs a container.
+
+### What `--dry-run` will tell you
+
+Besides the per-field `block` / `declared` / `none` report, it flags two things worth catching
+before a run rather than after:
+
+- **`DRIFT`** — the `claude-sdk` and `langchain` runtimes embed the charter in `agent.py` *and*
+  ship it as `charter.yaml`. If the two disagree, the file you'd audit isn't the one that runs;
+  `--dry-run` names the fields. Regenerate rather than hand-editing either copy.
+- **`CAVEAT`** — the charter declares an auth credential that isn't set in your environment. The
+  run may still authenticate from a stored CLI login, in which case the credential the charter
+  names isn't the real auth path, and the account billed is whichever that login belongs to.
 
 ## How it works: the spine
 
@@ -316,8 +369,8 @@ agent-builder-charter/
 
 | | Enforced walls | Status |
 |---|---|---|
-| **claude-headless** | model · tools (dangerous tools denied) · steps (`--max-turns`) · wall-clock timeout · network egress (hook) · env-scoped credentials · log redaction · retention pruning · eval gate · run log | shipped (v0.2) |
-| **claude-sdk** | model · tools (dangerous denied) · steps (max_turns) · wall-clock · egress (PreToolUse hook) · env-scoped auth (api-key or subscription) · log redaction · retention · eval gate · run log | shipped (v0.2) |
+| **claude-headless** | model · tools (dangerous tools denied) · steps (`--max-turns`) · wall-clock timeout · network egress (hook) · `Bash` narrowed to `bash_allow` endpoints · env-scoped credentials · log redaction · retention pruning · eval gate · run log | shipped (v0.2) |
+| **claude-sdk** | model · tools (dangerous denied) · steps (max_turns) · wall-clock · egress (PreToolUse hook) · `Bash` narrowed to `bash_allow` endpoints · env-scoped auth (api-key or subscription) · log redaction · retention · eval gate · run log | shipped (v0.2) |
 | **langchain** | model · tools (only bound tools exist) · steps (recursion_limit) · wall-clock · egress (in `fetch_url`) · filesystem jail (in the fs tools) · env-scoped credentials · log redaction · retention · eval gate · run log | shipped (v0.2) |
 | **openai-agents** | same charter, translated per SDK | planned |
 
