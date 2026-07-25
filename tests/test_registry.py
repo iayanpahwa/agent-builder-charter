@@ -135,6 +135,6 @@ def test_load_dir_matches_only_valid_charter_filenames(tmp_path, good_charter):
     reg.load_dir(str(tmp_path))
 
     ids = {r["charter"]["id"] for r in reg.all()}
-    assert "agent-exact" in ids        # exact "charter.yaml" is registered
-    assert "agent-suffixed" in ids     # "<name>.charter.yaml" is registered
+    assert "agent-exact" in ids  # exact "charter.yaml" is registered
+    assert "agent-suffixed" in ids  # "<name>.charter.yaml" is registered
     assert "agent-imposter" not in ids  # "notacharter.yaml" is NOT registered

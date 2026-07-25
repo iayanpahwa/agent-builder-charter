@@ -63,32 +63,24 @@ def test_scoped_env_undeclared_key_dropped():
 
 
 def test_egress_allows_allowlisted_host():
-    allow, _ = agent.fetch_egress_check(
-        "https://docs.python.org/3/", ["docs.python.org"]
-    )
+    allow, _ = agent.fetch_egress_check("https://docs.python.org/3/", ["docs.python.org"])
     assert allow
 
 
 def test_egress_denies_other_host():
-    allow, _ = agent.fetch_egress_check(
-        "https://evil.example.com/", ["docs.python.org"]
-    )
+    allow, _ = agent.fetch_egress_check("https://evil.example.com/", ["docs.python.org"])
     assert not allow
 
 
 def test_egress_denies_lookalike_prefix_host():
     # 'evildocs.python.org' shares a string suffix with 'docs.python.org' but is not a subdomain
     # of it (no dot before 'docs') — the dot-suffix rule must reject it.
-    allow, _ = agent.fetch_egress_check(
-        "https://evildocs.python.org/", ["docs.python.org"]
-    )
+    allow, _ = agent.fetch_egress_check("https://evildocs.python.org/", ["docs.python.org"])
     assert not allow
 
 
 def test_egress_allows_real_subdomain():
-    allow, _ = agent.fetch_egress_check(
-        "https://x.docs.python.org/", ["docs.python.org"]
-    )
+    allow, _ = agent.fetch_egress_check("https://x.docs.python.org/", ["docs.python.org"])
     assert allow
 
 
@@ -144,9 +136,7 @@ def _redirect(handler, newurl, code=302):
     import http.client
 
     req = urllib_request.Request("https://docs.python.org/3/")
-    return handler.redirect_request(
-        req, None, code, "Found", http.client.HTTPMessage(), newurl
-    )
+    return handler.redirect_request(req, None, code, "Found", http.client.HTTPMessage(), newurl)
 
 
 def test_redirect_to_offlist_host_is_refused():
@@ -219,9 +209,7 @@ def test_embedded_charter_validates(tmp_path):
 
 def test_resolve_root_relative_is_under_base(tmp_path):
     base = str(tmp_path)
-    assert agent.resolve_root("out", base) == os.path.realpath(
-        os.path.join(base, "out")
-    )
+    assert agent.resolve_root("out", base) == os.path.realpath(os.path.join(base, "out"))
 
 
 def test_resolve_root_none_when_unset():

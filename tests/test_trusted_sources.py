@@ -25,7 +25,6 @@ sys.path.insert(0, str(REPO_ROOT / "builders" / "claude-headless"))
 from run_headless import _system_prompt_file  # noqa: E402
 from loader import CharterInvalid, validate  # noqa: E402
 
-
 # --- 1. Schema layer: invalid trusted_sources are rejected ------------------
 
 INVALID_TRUSTED_SOURCES = [

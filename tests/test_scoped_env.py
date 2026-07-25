@@ -93,7 +93,5 @@ def test_no_stray_keys_leak(monkeypatch):
     result = scoped_env(charter)
     for key in result:
         assert (
-            key in _ESSENTIAL_VARS
-            or key.startswith(_ESSENTIAL_PREFIXES)
-            or key == "MY_DB_PW"
+            key in _ESSENTIAL_VARS or key.startswith(_ESSENTIAL_PREFIXES) or key == "MY_DB_PW"
         ), f"stray key leaked into scoped env: {key!r}"

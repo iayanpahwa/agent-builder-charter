@@ -23,8 +23,9 @@ import sys
 from urllib.parse import urlparse
 
 import os
+
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "core"))
-from loader import load_charter   # noqa: E402
+from loader import load_charter  # noqa: E402
 
 # Claude Code tools that reach the network, and where the URL sits in tool_input.
 NET_TOOLS = {"WebFetch": "url", "WebSearch": None}
@@ -32,13 +33,17 @@ NET_TOOLS = {"WebFetch": "url", "WebSearch": None}
 
 def decision(allow, reason):
     """Emit a Claude Code PreToolUse permission decision and exit."""
-    print(json.dumps({
-        "hookSpecificOutput": {
-            "hookEventName": "PreToolUse",
-            "permissionDecision": "allow" if allow else "deny",
-            "permissionDecisionReason": reason,
-        }
-    }))
+    print(
+        json.dumps(
+            {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "allow" if allow else "deny",
+                    "permissionDecisionReason": reason,
+                }
+            }
+        )
+    )
     sys.exit(0)
 
 
@@ -69,18 +74,28 @@ def main():
     # Only network tools are gated. Everything else ALWAYS passes — this is what keeps
     # the hook from ever deadlocking the session (Bash/Read/Edit/Task are never denied).
     if tool not in NET_TOOLS:
-        decision(True, f"egress_guard: '{tool}' is not a network tool; egress hook does not gate it")
+        decision(
+            True, f"egress_guard: '{tool}' is not a network tool; egress hook does not gate it"
+        )
 
     try:
-        charter = load_charter(args.charter)   # fail closed if the charter is invalid
+        charter = load_charter(args.charter)  # fail closed if the charter is invalid
     except Exception as e:  # noqa: BLE001 - any load failure must fail closed
-        decision(False, f"egress_guard: cannot load charter ({e}); failing closed on this network call")
+        decision(
+            False, f"egress_guard: cannot load charter ({e}); failing closed on this network call"
+        )
 
     egress = charter.get("egress", []) or []
     if "any" in egress:
-        decision(True, f"egress_guard: egress is open ([any]); '{tool}' allowed by charter '{charter['id']}'")
+        decision(
+            True,
+            f"egress_guard: egress is open ([any]); '{tool}' allowed by charter '{charter['id']}'",
+        )
     if "none" in egress:
-        decision(False, f"egress_guard: egress is [none] (no network); '{tool}' denied by charter '{charter['id']}'")
+        decision(
+            False,
+            f"egress_guard: egress is [none] (no network); '{tool}' denied by charter '{charter['id']}'",
+        )
 
     key = NET_TOOLS[tool]
     url = tool_input.get(key) if key else None
@@ -88,7 +103,10 @@ def main():
         # Reached only with a scoped egress list ([any]/[none] handled above). A tool with no
         # checkable URL (WebSearch) can't be confined to an allow-list — deny it. Use egress:[any]
         # to permit open search, or drop WebSearch from tools.
-        decision(False, f"egress_guard: '{tool}' has no host to check against egress {egress}; a scoped allow-list can't confine it — use egress:[any] to permit it or drop {tool}")
+        decision(
+            False,
+            f"egress_guard: '{tool}' has no host to check against egress {egress}; a scoped allow-list can't confine it — use egress:[any] to permit it or drop {tool}",
+        )
 
     host = urlparse(url).hostname or ""
     if host_allowed(host, egress):

@@ -35,17 +35,23 @@ SCHEMA_VIOLATIONS = [
         "isolation",
         id="bad_sandbox_isolation",
     ),
-    pytest.param(lambda c: c.__setitem__("owner", {"team": "x"}), "owner", id="owner_missing_required"),
+    pytest.param(
+        lambda c: c.__setitem__("owner", {"team": "x"}), "owner", id="owner_missing_required"
+    ),
     pytest.param(lambda c: c.__setitem__("foo", "bar"), "foo", id="unknown_top_level_key"),
     pytest.param(lambda c: c.__delitem__("tools"), "tools", id="missing_tools"),
     pytest.param(lambda c: c.__setitem__("version", "1.0"), "version", id="bad_version_pattern"),
-    pytest.param(lambda c: c.__setitem__("model", {"provider": "anthropic"}), "model", id="model_missing_id"),
+    pytest.param(
+        lambda c: c.__setitem__("model", {"provider": "anthropic"}), "model", id="model_missing_id"
+    ),
     pytest.param(
         lambda c: c.__setitem__("evals", {"suite": "x"}),
         "success_metric",
         id="evals_missing_success_metric",
     ),
-    pytest.param(lambda c: c.__setitem__("charter", "0.1"), "0.2", id="wrong_charter_schema_version"),
+    pytest.param(
+        lambda c: c.__setitem__("charter", "0.1"), "0.2", id="wrong_charter_schema_version"
+    ),
 ]
 
 

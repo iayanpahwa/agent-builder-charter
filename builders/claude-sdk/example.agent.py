@@ -15,6 +15,7 @@ Real walls this runner enforces (see enforcement_report() / --dry-run for the ho
   never fire. A PreToolUse hook runs first and its deny holds even under bypassPermissions — the
   same mechanism builders/claude-headless/egress_guard.py uses for the same reason.
 """
+
 # ---- stdlib only at import time; the SDK is imported LAZILY inside run() ----
 import argparse
 import asyncio
@@ -155,8 +156,10 @@ def egress_decision(tool_name, tool_input, allowlist):
     if "any" in allowlist:
         return True, f"egress is open ([any]); '{tool_name}' allowed"
     if tool_name == "WebSearch":
-        return False, ("WebSearch has no host to check against a scoped egress list; a search "
-                        "can't be confined to hosts — use egress:[any] to permit it or drop WebSearch")
+        return False, (
+            "WebSearch has no host to check against a scoped egress list; a search "
+            "can't be confined to hosts — use egress:[any] to permit it or drop WebSearch"
+        )
     if tool_name == "WebFetch":
         url = (tool_input or {}).get("url")
         if not url:
@@ -248,8 +251,9 @@ def _valid_json(out, v):
 
 def _claims_cited(out, keywords):
     kws = [str(k).lower() for k in (keywords or [])]
-    bad = [ln for ln in out.splitlines()
-           if any(k in ln.lower() for k in kws) and not _URL.search(ln)]
+    bad = [
+        ln for ln in out.splitlines() if any(k in ln.lower() for k in kws) and not _URL.search(ln)
+    ]
     return (not bad), (None if not bad else f"uncited claim line: {bad[0].strip()!r}")
 
 
@@ -268,7 +272,7 @@ def check_one(invariant, output):
     """invariant: a single-key dict like {'contains_url': True}. Returns (name, ok, detail)."""
     if not isinstance(invariant, dict) or len(invariant) != 1:
         return str(invariant), False, "malformed invariant (want a single-key mapping)"
-    (name, value), = invariant.items()
+    ((name, value),) = invariant.items()
     fn = _CHECKS.get(name)
     if fn is None:
         return name, False, f"unknown invariant type {name!r}"
@@ -356,7 +360,9 @@ def _read_trusted_sources(charter, base_dir):
     for s in srcs:
         p = os.path.realpath(os.path.join(base_dir, s))
         if p != base and not p.startswith(base + os.sep):
-            raise ValueError(f"context.trusted_sources: '{s}' escapes the agent directory {base_dir}")
+            raise ValueError(
+                f"context.trusted_sources: '{s}' escapes the agent directory {base_dir}"
+            )
         if not os.path.exists(p):
             raise ValueError(f"context.trusted_sources: '{s}' does not exist at {p}")
         with open(p) as f:
@@ -386,63 +392,120 @@ def enforcement_report(charter):
     rows = [("block", "status", "run refused unless status is 'enabled'")]
     rows.append(("block", "model", f"ClaudeAgentOptions.model={charter['model']['id']!r} pins it"))
     denied = [t for t in DANGEROUS if t not in tools]
-    rows.append(("block", "tools",
-                 f"disallowed_tools={denied} removes those tool definitions outright (checked even "
-                 f"under bypassPermissions); allowed_tools={tools} is declarative only here — "
-                 f"bypassPermissions auto-approves anything NOT denied, so allowed_tools does not "
-                 f"itself narrow further"))
+    rows.append(
+        (
+            "block",
+            "tools",
+            f"disallowed_tools={denied} removes those tool definitions outright (checked even "
+            f"under bypassPermissions); allowed_tools={tools} is declarative only here — "
+            f"bypassPermissions auto-approves anything NOT denied, so allowed_tools does not "
+            f"itself narrow further",
+        )
+    )
     if budget.get("steps"):
         rows.append(("block", "budget.steps", f"max_turns={budget['steps']} hard-stops the run"))
     else:
         rows.append(("—", "budget.steps", "not set"))
     if budget.get("wall_clock_seconds"):
-        rows.append(("block", "budget.wall_clock",
-                     f"asyncio.wait_for(...,timeout={budget['wall_clock_seconds']}) hard-kills the run "
-                     f"and closes the SDK's generator"))
+        rows.append(
+            (
+                "block",
+                "budget.wall_clock",
+                f"asyncio.wait_for(...,timeout={budget['wall_clock_seconds']}) hard-kills the run "
+                f"and closes the SDK's generator",
+            )
+        )
     else:
         rows.append(("—", "budget.wall_clock", "not set"))
     if budget.get("usd"):
-        rows.append(("declared", "budget.usd",
-                     f"max_budget_usd={budget['usd']} — a CLIENT-SIDE cost ESTIMATE the SDK tracks, "
-                     f"not a metered hard wall; verify"))
+        rows.append(
+            (
+                "declared",
+                "budget.usd",
+                f"max_budget_usd={budget['usd']} — a CLIENT-SIDE cost ESTIMATE the SDK tracks, "
+                f"not a metered hard wall; verify",
+            )
+        )
     else:
         rows.append(("—", "budget.usd", "not set"))
     # The PreToolUse hook is registered unconditionally in run(), so it gates WebFetch/WebSearch
     # to the egress policy whether or not the charter granted those tools — a scoped or [none]
     # egress is a real backstop even for a text-only agent (defense in depth).
     if "any" in egress:
-        rows.append(("none", "egress",
-                     "egress:[any] — the hook allows all hosts, and under bypassPermissions "
-                     "WebFetch/WebSearch aren't walled out, so network is effectively open (not a wall)"))
+        rows.append(
+            (
+                "none",
+                "egress",
+                "egress:[any] — the hook allows all hosts, and under bypassPermissions "
+                "WebFetch/WebSearch aren't walled out, so network is effectively open (not a wall)",
+            )
+        )
     else:
         granted = {"WebFetch", "WebSearch"} & set(tools)
-        scope = ("gates WebFetch to the allow-list and denies WebSearch outright (a search can't be "
-                 "confined to hosts)") if granted else \
-                ("denies any WebFetch/WebSearch attempt — none is granted, so this is a backstop, not "
-                 "the primary wall")
-        rows.append(("block", "egress",
-                     f"a PreToolUse hook (HookMatcher on WebFetch|WebSearch) {scope}; egress={egress}. "
-                     "NOT the can_use_tool callback — that is shadowed by permission_mode="
-                     "bypassPermissions (bypass approves BEFORE can_use_tool runs); a PreToolUse hook "
-                     "runs first and its deny holds regardless of mode"))
-    rows.append(("block", "credentials.env",
-                 f"scoped subprocess env (replaces os.environ for this process): auth mode={mode}; "
-                 f"keeps {cred_var} + OS essentials + CLAUDE_*/LC_*; drops {dropped_by_mode} plus "
-                 f"every other host secret"))
-    rows.append(("none", "sandbox",
-                 "a real fs/net jail needs a container; the `claude` CLI subprocess the SDK spawns "
-                 "is not filesystem-isolated"))
+        scope = (
+            (
+                "gates WebFetch to the allow-list and denies WebSearch outright (a search can't be "
+                "confined to hosts)"
+            )
+            if granted
+            else (
+                "denies any WebFetch/WebSearch attempt — none is granted, so this is a backstop, not "
+                "the primary wall"
+            )
+        )
+        rows.append(
+            (
+                "block",
+                "egress",
+                f"a PreToolUse hook (HookMatcher on WebFetch|WebSearch) {scope}; egress={egress}. "
+                "NOT the can_use_tool callback — that is shadowed by permission_mode="
+                "bypassPermissions (bypass approves BEFORE can_use_tool runs); a PreToolUse hook "
+                "runs first and its deny holds regardless of mode",
+            )
+        )
+    rows.append(
+        (
+            "block",
+            "credentials.env",
+            f"scoped subprocess env (replaces os.environ for this process): auth mode={mode}; "
+            f"keeps {cred_var} + OS essentials + CLAUDE_*/LC_*; drops {dropped_by_mode} plus "
+            f"every other host secret",
+        )
+    )
+    rows.append(
+        (
+            "none",
+            "sandbox",
+            "a real fs/net jail needs a container; the `claude` CLI subprocess the SDK spawns "
+            "is not filesystem-isolated",
+        )
+    )
     escapes = [t for t in tools if t == "Bash"]
     if escapes:
-        rows.append(("none", "egress.other",
-                     f"{', '.join(escapes)} reaches the network OUTSIDE this hook — a container is "
-                     f"required to fence it"))
-    rows.append(("declared", "context",
-                 "trusted_sources concatenated into system_prompt; fetched pages/memory are NOT "
-                 "auto-tagged untrusted by this runner"))
+        rows.append(
+            (
+                "none",
+                "egress.other",
+                f"{', '.join(escapes)} reaches the network OUTSIDE this hook — a container is "
+                f"required to fence it",
+            )
+        )
+    rows.append(
+        (
+            "declared",
+            "context",
+            "trusted_sources concatenated into system_prompt; fetched pages/memory are NOT "
+            "auto-tagged untrusted by this runner",
+        )
+    )
     if charter.get("approval_tier", {}).get("human_approval"):
-        rows.append(("none", "approval_tier",
-                     "unattended (permission_mode=bypassPermissions) has no approval queue"))
+        rows.append(
+            (
+                "none",
+                "approval_tier",
+                "unattended (permission_mode=bypassPermissions) has no approval queue",
+            )
+        )
     else:
         rows.append(("declared", "approval_tier", "no human-approval actions declared"))
     rows.append(("declared", "data.class", f"{data.get('class')} — advisory"))
@@ -453,25 +516,47 @@ def enforcement_report(charter):
             what.append(f"{n_pat} declared pattern(s)")
         if creds:
             what.append("env: credential values")
-        rows.append(("block", "data.redact",
-                     f"{' + '.join(what)} scrubbed from saved output, console, and eval detail before "
-                     "write (only as complete as your patterns)"))
+        rows.append(
+            (
+                "block",
+                "data.redact",
+                f"{' + '.join(what)} scrubbed from saved output, console, and eval detail before "
+                "write (only as complete as your patterns)",
+            )
+        )
     else:
-        rows.append(("declared", "data.redact", "nothing to redact — no patterns, no env: credentials"))
+        rows.append(
+            ("declared", "data.redact", "nothing to redact — no patterns, no env: credentials")
+        )
     if data.get("retention_days"):
-        rows.append(("block", "data.retention",
-                     f"output files & runs.jsonl entries older than {data['retention_days']}d pruned "
-                     f"when the agent runs (housekeeping, not a daemon)"))
+        rows.append(
+            (
+                "block",
+                "data.retention",
+                f"output files & runs.jsonl entries older than {data['retention_days']}d pruned "
+                f"when the agent runs (housekeeping, not a daemon)",
+            )
+        )
     else:
         rows.append(("declared", "data.retention", "no retention window; logs kept indefinitely"))
     evals = charter.get("evals") or {}
-    rows.append(("declared", "evals",
-                 f"suite={evals.get('suite')!r} — gated inline in run() if that file exists on disk"))
+    rows.append(
+        (
+            "declared",
+            "evals",
+            f"suite={evals.get('suite')!r} — gated inline in run() if that file exists on disk",
+        )
+    )
     obs = observability(charter)
-    rows.append(("declared", "observability",
-                 f"stream={obs['stream']} trace={obs['trace']} — live agent-loop echo to the console "
-                 "and/or a per-run tool-call trace file (redacted); operational only, not a wall "
-                 "(extensions.observability; override at run time with --stream/--quiet/--trace/--no-trace)"))
+    rows.append(
+        (
+            "declared",
+            "observability",
+            f"stream={obs['stream']} trace={obs['trace']} — live agent-loop echo to the console "
+            "and/or a per-run tool-call trace file (redacted); operational only, not a wall "
+            "(extensions.observability; override at run time with --stream/--quiet/--trace/--no-trace)",
+        )
+    )
 
     lines = [f"=== claude-sdk enforcement: {charter['id']} v{charter['version']} ==="]
     lines.append(f"auth mode: {mode}")
@@ -479,16 +564,22 @@ def enforcement_report(charter):
         lines.append(f"  {status:<10} {field:<20} {note}")
     lines.append("")
     if mode == "api-key":
-        lines.append("billing/ToS: api-key mode — bills your Anthropic API account per token; "
-                      "the sanctioned, shareable mode for an unattended agent.")
+        lines.append(
+            "billing/ToS: api-key mode — bills your Anthropic API account per token; "
+            "the sanctioned, shareable mode for an unattended agent."
+        )
     elif mode == "subscription":
-        lines.append("billing/ToS: subscription mode — rides your Claude Code seat via "
-                      "CLAUDE_CODE_OAUTH_TOKEN; check your plan's terms before running this "
-                      "unattended or on shared infrastructure.")
+        lines.append(
+            "billing/ToS: subscription mode — rides your Claude Code seat via "
+            "CLAUDE_CODE_OAUTH_TOKEN; check your plan's terms before running this "
+            "unattended or on shared infrastructure."
+        )
     else:
-        lines.append("billing/ToS: no api-key/subscription credential declared — scoped_env drops "
-                      "ANTHROPIC_API_KEY, CLAUDE_CODE_OAUTH_TOKEN, and ANTHROPIC_AUTH_TOKEN; a real "
-                      "run will fail to authenticate.")
+        lines.append(
+            "billing/ToS: no api-key/subscription credential declared — scoped_env drops "
+            "ANTHROPIC_API_KEY, CLAUDE_CODE_OAUTH_TOKEN, and ANTHROPIC_AUTH_TOKEN; a real "
+            "run will fail to authenticate."
+        )
     lines.append(CACHING_NOTE)
     lines.append("\n[dry-run] not executed.")
     return "\n".join(lines)
@@ -538,17 +629,26 @@ async def run(trigger, prompt, stream=None, trace=None):
             query,
         )
     except ImportError:
-        print("REFUSED: claude-agent-sdk is not installed.\n"
-              "  pip install -r builders/claude-sdk/requirements.txt   (or: pip install claude-agent-sdk)\n"
-              "  Also needs the `claude` CLI (Node) on PATH, authenticated.")
+        print(
+            "REFUSED: claude-agent-sdk is not installed.\n"
+            "  pip install -r builders/claude-sdk/requirements.txt   (or: pip install claude-agent-sdk)\n"
+            "  Also needs the `claude` CLI (Node) on PATH, authenticated."
+        )
         sys.exit(6)
 
     try:
         system_prompt = _read_trusted_sources(charter, HERE)
     except ValueError as e:
         print(f"REFUSED: {e}")
-        _log_run({"id": charter["id"], "timestamp": now(), "trigger": trigger,
-                  "outcome": "refused", "reason": str(e)})
+        _log_run(
+            {
+                "id": charter["id"],
+                "timestamp": now(),
+                "trigger": trigger,
+                "outcome": "refused",
+                "reason": str(e),
+            }
+        )
         sys.exit(2)
 
     tools = list(charter.get("tools") or [])
@@ -562,14 +662,17 @@ async def run(trigger, prompt, stream=None, trace=None):
         if input_data.get("hook_event_name") != "PreToolUse":
             return {}
         allow, reason = egress_decision(
-            input_data.get("tool_name", ""), input_data.get("tool_input") or {}, egress)
+            input_data.get("tool_name", ""), input_data.get("tool_input") or {}, egress
+        )
         if allow:
             return {}
-        return {"hookSpecificOutput": {
-            "hookEventName": "PreToolUse",
-            "permissionDecision": "deny",
-            "permissionDecisionReason": reason,
-        }}
+        return {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "deny",
+                "permissionDecisionReason": reason,
+            }
+        }
 
     options = ClaudeAgentOptions(
         model=charter["model"]["id"],
@@ -585,8 +688,11 @@ async def run(trigger, prompt, stream=None, trace=None):
     # secrets are needed up-front so streamed/traced tool calls are redacted live, not just at save
     data = charter.get("data") or {}
     patterns = data.get("redact") or []
-    secret_values = [os.environ[cred["ref"][4:]] for cred in (charter.get("credentials") or [])
-                      if cred.get("ref", "").startswith("env:") and cred["ref"][4:] in os.environ]
+    secret_values = [
+        os.environ[cred["ref"][4:]]
+        for cred in (charter.get("credentials") or [])
+        if cred.get("ref", "").startswith("env:") and cred["ref"][4:] in os.environ
+    ]
 
     run_ts = datetime.now().strftime("%Y%m%dT%H%M%S")
     trace_fp = open(_unique_path(_logdir(), run_ts, "trace.jsonl"), "w") if trace else None
@@ -632,7 +738,9 @@ async def run(trigger, prompt, stream=None, trace=None):
     killed = False
     tool_calls = 0
     try:
-        assistant_text, result_msg, tool_calls = await asyncio.wait_for(_collect(gen), timeout=wall_clock)
+        assistant_text, result_msg, tool_calls = await asyncio.wait_for(
+            _collect(gen), timeout=wall_clock
+        )
     except asyncio.TimeoutError:
         killed = True
         assistant_text, result_msg = "", None
@@ -664,11 +772,14 @@ async def run(trigger, prompt, stream=None, trace=None):
         suite_path = os.path.join(HERE, suite_rel)
         if os.path.exists(suite_path):
             import yaml
+
             cases = (yaml.safe_load(open(suite_path)) or {}).get("cases", []) or []
             allpass = True
             for case in cases:
                 for iname, ok, detail in check_all(case.get("invariants", []), result_text):
-                    invariants.append({"case": case.get("id"), "invariant": iname, "pass": ok, "detail": detail})
+                    invariants.append(
+                        {"case": case.get("id"), "invariant": iname, "pass": ok, "detail": detail}
+                    )
                     allpass = allpass and ok
             if cases:
                 outcome = "complete" if allpass else "failed"
@@ -681,21 +792,36 @@ async def run(trigger, prompt, stream=None, trace=None):
             inv["detail"] = redact(inv["detail"], patterns, secret_values)
 
     out_path = _save_output(safe_result, run_ts)
-    _log_run({"id": charter["id"], "timestamp": now(), "trigger": trigger,
-              "model": charter["model"]["id"], "duration_s": elapsed, "outcome": outcome,
-              "cost_usd": cost, "tool_calls": tool_calls, "invariants": invariants,
-              "output_chars": len(safe_result), "output_file": os.path.basename(out_path),
-              "trace_file": os.path.basename(trace_path) if trace_path else None})
+    _log_run(
+        {
+            "id": charter["id"],
+            "timestamp": now(),
+            "trigger": trigger,
+            "model": charter["model"]["id"],
+            "duration_s": elapsed,
+            "outcome": outcome,
+            "cost_usd": cost,
+            "tool_calls": tool_calls,
+            "invariants": invariants,
+            "output_chars": len(safe_result),
+            "output_file": os.path.basename(out_path),
+            "trace_file": os.path.basename(trace_path) if trace_path else None,
+        }
+    )
     _prune_logs(data.get("retention_days"))
 
     if not stream:  # when streaming, the output was already echoed live
         print(f"\n--- output ({len(safe_result)} chars, saved to logs/) ---")
         print(safe_result[:800] + ("…" if len(safe_result) > 800 else ""))
-    print(f"\ncost_usd: {cost}   duration: {elapsed}s   outcome: {outcome}   tool_calls: {tool_calls}")
+    print(
+        f"\ncost_usd: {cost}   duration: {elapsed}s   outcome: {outcome}   tool_calls: {tool_calls}"
+    )
     if invariants:
         for r in invariants:
-            print(f"  {'PASS' if r['pass'] else 'FAIL'}  {r['case']}:{r['invariant']}"
-                  + (f"  <- {r['detail']}" if r["detail"] else ""))
+            print(
+                f"  {'PASS' if r['pass'] else 'FAIL'}  {r['case']}:{r['invariant']}"
+                + (f"  <- {r['detail']}" if r["detail"] else "")
+            )
     if outcome == "failed":
         sys.exit(1)
 
@@ -704,18 +830,36 @@ async def run(trigger, prompt, stream=None, trace=None):
 # 4. main()
 # ============================================================================
 def main():
-    ap = argparse.ArgumentParser(description="sdk-docs-researcher — a CHARTER-governed Claude Agent SDK agent")
+    ap = argparse.ArgumentParser(
+        description="sdk-docs-researcher — a CHARTER-governed Claude Agent SDK agent"
+    )
     ap.add_argument("trigger", nargs="?", default="manual")
-    ap.add_argument("--dry-run", action="store_true", help="print the enforcement report; do not run, no tokens spent")
+    ap.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="print the enforcement report; do not run, no tokens spent",
+    )
     ap.add_argument("--prompt", default=None, help="task prompt; default is prompts/task.md")
-    ap.add_argument("--stream", dest="stream", action="store_true", default=None,
-                    help="echo the agent loop live (overrides extensions.observability.stream)")
-    ap.add_argument("--quiet", dest="stream", action="store_false",
-                    help="do not echo the loop live")
-    ap.add_argument("--trace", dest="trace", action="store_true", default=None,
-                    help="write a per-run tool-call trace file (overrides extensions.observability.trace)")
-    ap.add_argument("--no-trace", dest="trace", action="store_false",
-                    help="do not write a trace file")
+    ap.add_argument(
+        "--stream",
+        dest="stream",
+        action="store_true",
+        default=None,
+        help="echo the agent loop live (overrides extensions.observability.stream)",
+    )
+    ap.add_argument(
+        "--quiet", dest="stream", action="store_false", help="do not echo the loop live"
+    )
+    ap.add_argument(
+        "--trace",
+        dest="trace",
+        action="store_true",
+        default=None,
+        help="write a per-run tool-call trace file (overrides extensions.observability.trace)",
+    )
+    ap.add_argument(
+        "--no-trace", dest="trace", action="store_false", help="do not write a trace file"
+    )
     args = ap.parse_args()
 
     if args.dry_run:

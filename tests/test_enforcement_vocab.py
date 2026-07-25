@@ -37,11 +37,13 @@ FULLY_POPULATED_OVERRIDES = dict(
     data={"class": "pii", "retention_days": 7, "redact": ["token"]},
     credentials=[{"name": "db", "ref": "vault://x", "scope": "read-only"}],
     extensions={"human_verification": {"expected": True, "note": "x"}},
-    mcp=[{
-        "name": "docs",
-        "server": {"type": "stdio", "command": "npx", "args": ["-y", "docs-mcp-server"]},
-        "allow": ["*"],
-    }],
+    mcp=[
+        {
+            "name": "docs",
+            "server": {"type": "stdio", "command": "npx", "args": ["-y", "docs-mcp-server"]},
+            "allow": ["*"],
+        }
+    ],
     skills=["new-agent"],
 )
 
@@ -101,7 +103,8 @@ def test_block_tagged_fields_all_have_report_rows(good_charter):
     with open(SCHEMA_PATH) as f:
         schema = yaml.safe_load(f)
     block_fields = [
-        name for name, spec in schema["properties"].items()
+        name
+        for name, spec in schema["properties"].items()
         if "block" in _as_list(spec.get("x-enforced"))
     ]
     assert block_fields, "expected at least one x-enforced: block field in the schema"
@@ -111,6 +114,6 @@ def test_block_tagged_fields_all_have_report_rows(good_charter):
     rows = report(charter)
     fields = [field for _, field, _ in rows]
     for block_field in block_fields:
-        assert any(f == block_field or f.startswith(block_field + ".") for f in fields), (
-            f"no report row for block-tagged field {block_field!r} — fields present: {fields}"
-        )
+        assert any(
+            f == block_field or f.startswith(block_field + ".") for f in fields
+        ), f"no report row for block-tagged field {block_field!r} — fields present: {fields}"

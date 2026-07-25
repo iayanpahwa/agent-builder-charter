@@ -41,9 +41,9 @@ import time
 from datetime import datetime
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(HERE, "..", "..", "core"))   # shared runtime-neutral engine
-from loader import CharterInvalid, load_charter   # noqa: E402
-import eval_checks                                 # noqa: E402
+sys.path.insert(0, os.path.join(HERE, "..", "..", "core"))  # shared runtime-neutral engine
+from loader import CharterInvalid, load_charter  # noqa: E402
+import eval_checks  # noqa: E402
 
 DANGEROUS = ["Bash", "Write", "Edit", "MultiEdit", "NotebookEdit", "Task"]
 
@@ -204,11 +204,18 @@ def _settings_file(charter, charter_path):
     tools = charter.get("tools", []) or []
     if (NET_TOOLS & set(tools)) and egress and "any" not in egress:
         guard = os.path.join(HERE, "egress_guard.py")
-        settings["hooks"] = {"PreToolUse": [
-            {"matcher": "WebFetch|WebSearch", "hooks": [
-                {"type": "command", "command": f"python3 {guard} --charter {charter_path}"}]}]}
+        settings["hooks"] = {
+            "PreToolUse": [
+                {
+                    "matcher": "WebFetch|WebSearch",
+                    "hooks": [
+                        {"type": "command", "command": f"python3 {guard} --charter {charter_path}"}
+                    ],
+                }
+            ]
+        }
     if charter.get("skills"):
-        settings["availableSkills"] = charter["skills"]   # restrict to ONLY these
+        settings["availableSkills"] = charter["skills"]  # restrict to ONLY these
     if not settings:
         return None
     fd, path = tempfile.mkstemp(suffix=".settings.json")
@@ -220,13 +227,20 @@ def _settings_file(charter, charter_path):
 def build_command(charter, charter_dir, charter_path, prompt):
     tools = list(charter.get("tools", []) or [])
     budget = charter.get("budget") or {}
-    cmd = ["claude", "-p", prompt,
-           "--model", charter["model"]["id"],
-           "--permission-mode", "bypassPermissions",
-           "--output-format", "json"]
+    cmd = [
+        "claude",
+        "-p",
+        prompt,
+        "--model",
+        charter["model"]["id"],
+        "--permission-mode",
+        "bypassPermissions",
+        "--output-format",
+        "json",
+    ]
     mcp_file, mcp_allowed = _mcp_config_file(charter)
     if mcp_file:
-        cmd += ["--mcp-config", mcp_file, "--strict-mcp-config"]   # ONLY charter servers
+        cmd += ["--mcp-config", mcp_file, "--strict-mcp-config"]  # ONLY charter servers
     allowed = tools + mcp_allowed
     if allowed:
         cmd += ["--allowedTools", ",".join(allowed)]
@@ -234,7 +248,7 @@ def build_command(charter, charter_dir, charter_path, prompt):
         if denied:
             cmd += ["--disallowedTools", ",".join(denied)]
     else:
-        cmd += ["--disallowedTools", "*"]     # text-only agent: no tools at all
+        cmd += ["--disallowedTools", "*"]  # text-only agent: no tools at all
     if budget.get("steps"):
         cmd += ["--max-turns", str(budget["steps"])]
     sys_file = _system_prompt_file(charter, charter_dir)
@@ -256,25 +270,65 @@ def report(charter):
     net = bool(NET_TOOLS & set(tools))
     rows = [
         ("block", "status", "run refused unless status is 'enabled'"),
-        ("declared", "context", "trusted_sources concatenated into the system prompt; fetched pages & memory are NOT auto-tagged or cleaned in headless"),
+        (
+            "declared",
+            "context",
+            "trusted_sources concatenated into the system prompt; fetched pages & memory are NOT auto-tagged or cleaned in headless",
+        ),
         ("block", "model", "--model pins it"),
         ("none", "sandbox", "a real fs/net jail needs a container; flags can't"),
     ]
-    rows.append(("block", "budget.steps", "--max-turns hard-stops the run")
-                if budget.get("steps") else ("—", "budget.steps", "not set"))
-    rows.append(("block", "budget.wall_clock", "subprocess timeout hard-kills the run")
-                if budget.get("wall_clock_seconds") else ("—", "budget.wall_clock", "not set (default 120s)"))
+    rows.append(
+        ("block", "budget.steps", "--max-turns hard-stops the run")
+        if budget.get("steps")
+        else ("—", "budget.steps", "not set")
+    )
+    rows.append(
+        ("block", "budget.wall_clock", "subprocess timeout hard-kills the run")
+        if budget.get("wall_clock_seconds")
+        else ("—", "budget.wall_clock", "not set (default 120s)")
+    )
     if budget.get("tokens"):
-        rows.append(("none", "budget.tokens", "no token-ceiling flag in headless; bounded by steps/wall-clock/usd"))
+        rows.append(
+            (
+                "none",
+                "budget.tokens",
+                "no token-ceiling flag in headless; bounded by steps/wall-clock/usd",
+            )
+        )
     if budget.get("usd"):
-        rows.append(("declared", "budget.usd", f"--max-budget-usd {budget['usd']} — MAY be a no-op under subscription auth; verify"))
+        rows.append(
+            (
+                "declared",
+                "budget.usd",
+                f"--max-budget-usd {budget['usd']} — MAY be a no-op under subscription auth; verify",
+            )
+        )
     rows.append(("block", "tools", "--allowedTools + --disallowedTools (dangerous tools denied)"))
-    rows.append(("block", "credentials.env", "host env scoped to Claude's auth (CLAUDE_*/ANTHROPIC_*) + OS essentials + declared env: refs; all other host secrets dropped"))
-    rows.append(("none", "credentials.fs", "filesystem NOT isolated — file-stored secrets (dotfiles, ~/.aws, the config dir) stay readable; a container is required"))
+    rows.append(
+        (
+            "block",
+            "credentials.env",
+            "host env scoped to Claude's auth (CLAUDE_*/ANTHROPIC_*) + OS essentials + declared env: refs; all other host secrets dropped",
+        )
+    )
+    rows.append(
+        (
+            "none",
+            "credentials.fs",
+            "filesystem NOT isolated — file-stored secrets (dotfiles, ~/.aws, the config dir) stay readable; a container is required",
+        )
+    )
     if egress == ["none"]:
         rows.append(("block", "egress", "WebFetch/WebSearch denied (no network via web tools)"))
     elif net and egress and "any" not in egress:
-        rows.append(("block", "egress", "WebFetch gated to the allow-list; WebSearch denied (a search can't be confined to hosts)"))
+        rows.append(
+            (
+                "block",
+                "egress",
+                "WebFetch gated to the allow-list; WebSearch denied (a search can't be confined to hosts)",
+            )
+        )
     elif "any" in egress:
         rows.append(("none", "egress", "open ([any]) — nothing to gate"))
     else:
@@ -283,36 +337,90 @@ def report(charter):
     if charter.get("mcp"):
         _escapes.append("MCP servers")
     if _escapes:
-        rows.append(("none", "egress.other", f"{', '.join(_escapes)} reach the network OUTSIDE egress — the hook gates only WebFetch/WebSearch; a container is required to fence these"))
+        rows.append(
+            (
+                "none",
+                "egress.other",
+                f"{', '.join(_escapes)} reach the network OUTSIDE egress — the hook gates only WebFetch/WebSearch; a container is required to fence these",
+            )
+        )
     if charter.get("mcp"):
         names = ", ".join(s.get("name", "?") for s in charter["mcp"])
-        rows.append(("block", "mcp", f"only [{names}] loaded (--strict-mcp-config); each runs its OWN code/secrets — you're trusting it"))
+        rows.append(
+            (
+                "block",
+                "mcp",
+                f"only [{names}] loaded (--strict-mcp-config); each runs its OWN code/secrets — you're trusting it",
+            )
+        )
     if charter.get("skills"):
-        rows.append(("block", "skills", f"restricted to {charter['skills']} (settings.availableSkills; version-dependent)"))
+        rows.append(
+            (
+                "block",
+                "skills",
+                f"restricted to {charter['skills']} (settings.availableSkills; version-dependent)",
+            )
+        )
     if charter.get("approval_tier", {}).get("human_approval"):
-        rows.append(("none", "approval_tier", "headless is unattended (bypassPermissions); destructive actions are contained by omission from tools, not an approval queue"))
+        rows.append(
+            (
+                "none",
+                "approval_tier",
+                "headless is unattended (bypassPermissions); destructive actions are contained by omission from tools, not an approval queue",
+            )
+        )
     else:
         rows.append(("declared", "approval_tier", "no human-approval actions declared"))
     rows.append(("declared", "data.class", "recorded; sensitivity is advisory in headless"))
     _data = charter.get("data") or {}
-    _has_env_creds = any((c.get("ref", "") or "").startswith("env:") for c in (charter.get("credentials") or []))
+    _has_env_creds = any(
+        (c.get("ref", "") or "").startswith("env:") for c in (charter.get("credentials") or [])
+    )
     if _data.get("redact") or _has_env_creds:
-        _what = "declared patterns + env: credential values" if _data.get("redact") else "declared env: credential values"
-        rows.append(("block", "data.redact", f"{_what} scrubbed from saved output, console, and eval detail before write (only as complete as your patterns)"))
+        _what = (
+            "declared patterns + env: credential values"
+            if _data.get("redact")
+            else "declared env: credential values"
+        )
+        rows.append(
+            (
+                "block",
+                "data.redact",
+                f"{_what} scrubbed from saved output, console, and eval detail before write (only as complete as your patterns)",
+            )
+        )
     else:
-        rows.append(("declared", "data.redact", "nothing to redact — no patterns and no env: credentials declared"))
+        rows.append(
+            (
+                "declared",
+                "data.redact",
+                "nothing to redact — no patterns and no env: credentials declared",
+            )
+        )
     if _data.get("retention_days"):
-        rows.append(("block", "data.retention", f"output files & runs.jsonl entries older than {_data['retention_days']}d pruned when the agent runs (housekeeping, not a daemon)"))
+        rows.append(
+            (
+                "block",
+                "data.retention",
+                f"output files & runs.jsonl entries older than {_data['retention_days']}d pruned when the agent runs (housekeeping, not a daemon)",
+            )
+        )
     else:
         rows.append(("declared", "data.retention", "no retention window; logs kept indefinitely"))
-    rows.append(("declared", "evals", "run with --eval to gate on invariants; the suite/SLO are checked outside this runner"))
+    rows.append(
+        (
+            "declared",
+            "evals",
+            "run with --eval to gate on invariants; the suite/SLO are checked outside this runner",
+        )
+    )
     if charter.get("extensions"):
         rows.append(("declared", "extensions", "ignored by the loader; declared only"))
     return rows
 
 
 def _shellish(s):
-    return shlex.quote(s) if (not s or any(c in s for c in ' "\'\n\t')) else s
+    return shlex.quote(s) if (not s or any(c in s for c in " \"'\n\t")) else s
 
 
 def _cleanup(paths):
@@ -329,19 +437,19 @@ def _kill_process_group(proc, grace=3):
     try:
         pgid = os.getpgid(proc.pid)
     except ProcessLookupError:
-        return                       # already gone
+        return  # already gone
     try:
         os.killpg(pgid, signal.SIGTERM)
     except ProcessLookupError:
         return
     try:
-        proc.communicate(timeout=grace)   # let it exit gracefully; drains the pipes
+        proc.communicate(timeout=grace)  # let it exit gracefully; drains the pipes
     except subprocess.TimeoutExpired:
         try:
             os.killpg(pgid, signal.SIGKILL)
         except ProcessLookupError:
             pass
-        proc.communicate()                # reap
+        proc.communicate()  # reap
 
 
 _ESSENTIAL_VARS = ("PATH", "HOME", "USER", "LOGNAME", "SHELL", "TERM", "TMPDIR", "TZ", "LANG")
@@ -396,8 +504,16 @@ def main():
 
     if charter.get("status") != "enabled":
         print(f"REFUSED: status={charter.get('status')} (not enabled)")
-        log_run(charter_dir, {"name": name, "timestamp": now(), "trigger": args.trigger,
-                              "outcome": "refused", "reason": f"status={charter.get('status')}"})
+        log_run(
+            charter_dir,
+            {
+                "name": name,
+                "timestamp": now(),
+                "trigger": args.trigger,
+                "outcome": "refused",
+                "reason": f"status={charter.get('status')}",
+            },
+        )
         sys.exit(3)
 
     prompt = args.prompt
@@ -414,8 +530,16 @@ def main():
         cmd, tmpfiles = build_command(charter, charter_dir, charter_path, prompt)
     except CharterInvalid as e:
         print(f"REFUSED: {e}")
-        log_run(charter_dir, {"name": name, "timestamp": now(), "trigger": args.trigger,
-                              "outcome": "refused", "reason": str(e)})
+        log_run(
+            charter_dir,
+            {
+                "name": name,
+                "timestamp": now(),
+                "trigger": args.trigger,
+                "outcome": "refused",
+                "reason": str(e),
+            },
+        )
         sys.exit(2)
 
     print(f"\n=== headless run: {name} (trigger={args.trigger}) ===")
@@ -434,9 +558,16 @@ def main():
     timeout = (charter.get("budget") or {}).get("wall_clock_seconds", 120)
     t0 = time.time()
     try:
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                text=True, env=scoped_env(charter),  # scoped: Claude's auth + declared env: creds only; fs isolation still needs a container
-                                start_new_session=True)  # own process group so timeout can reap grandchildren
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=scoped_env(
+                charter
+            ),  # scoped: Claude's auth + declared env: creds only; fs isolation still needs a container
+            start_new_session=True,
+        )  # own process group so timeout can reap grandchildren
     except FileNotFoundError:
         print("REFUSED: `claude` CLI not found on PATH.")
         _cleanup(tmpfiles)
@@ -448,8 +579,17 @@ def main():
         elapsed = round(time.time() - t0, 1)
         _kill_process_group(proc)  # kill claude AND anything it spawned, not just the direct child
         print(f"\nKILLED: wall-clock timeout {timeout}s hit")
-        log_run(charter_dir, {"name": name, "timestamp": now(), "trigger": args.trigger,
-                              "model": charter["model"]["id"], "outcome": "timeout", "duration_s": elapsed})
+        log_run(
+            charter_dir,
+            {
+                "name": name,
+                "timestamp": now(),
+                "trigger": args.trigger,
+                "model": charter["model"]["id"],
+                "outcome": "timeout",
+                "duration_s": elapsed,
+            },
+        )
         _cleanup(tmpfiles)
         sys.exit(5)
     _cleanup(tmpfiles)
@@ -467,11 +607,14 @@ def main():
         cases_path = os.path.join(charter_dir, "evals", "cases.yaml")
         if os.path.exists(cases_path):
             import yaml
+
             cases = (yaml.safe_load(open(cases_path)) or {}).get("cases", []) or []
             allpass = True
             for case in cases:
                 for iname, ok, detail in eval_checks.check_all(case.get("invariants", []), result):
-                    invariants.append({"case": case.get("id"), "invariant": iname, "pass": ok, "detail": detail})
+                    invariants.append(
+                        {"case": case.get("id"), "invariant": iname, "pass": ok, "detail": detail}
+                    )
                     allpass = allpass and ok
             outcome = "complete" if (allpass and cases) else ("failed" if cases else "ran")
 
@@ -487,10 +630,21 @@ def main():
 
     out_path = save_output(charter_dir, safe_result)
 
-    log_run(charter_dir, {"name": name, "timestamp": now(), "trigger": args.trigger,
-                          "model": charter["model"]["id"], "duration_s": elapsed,
-                          "outcome": outcome, "cost_usd": cost, "invariants": invariants,
-                          "output_chars": len(safe_result), "output_file": os.path.basename(out_path)})
+    log_run(
+        charter_dir,
+        {
+            "name": name,
+            "timestamp": now(),
+            "trigger": args.trigger,
+            "model": charter["model"]["id"],
+            "duration_s": elapsed,
+            "outcome": outcome,
+            "cost_usd": cost,
+            "invariants": invariants,
+            "output_chars": len(safe_result),
+            "output_file": os.path.basename(out_path),
+        },
+    )
 
     prune_logs(charter_dir, _data.get("retention_days"))
 
@@ -499,15 +653,19 @@ def main():
     print(f"\ncost_usd: {cost}   duration: {elapsed}s")
     if args.eval and invariants:
         for r in invariants:
-            print(f"  {'PASS' if r['pass'] else 'FAIL'}  {r['case']}:{r['invariant']}"
-                  + (f"  ← {r['detail']}" if r["detail"] else ""))
-        print(f"\nTASK {'COMPLETE ✅' if outcome == 'complete' else 'FAILED ❌'}  (logged to logs/runs.jsonl)")
+            print(
+                f"  {'PASS' if r['pass'] else 'FAIL'}  {r['case']}:{r['invariant']}"
+                + (f"  ← {r['detail']}" if r["detail"] else "")
+            )
+        print(
+            f"\nTASK {'COMPLETE ✅' if outcome == 'complete' else 'FAILED ❌'}  (logged to logs/runs.jsonl)"
+        )
     else:
         print("\n(ran; no eval gate — add evals + pass --eval to gate on invariants)")
     if proc.returncode != 0:
         print(f"[claude exit {proc.returncode}] {(stderr or '')[:300]}")
     if outcome == "failed":
-        sys.exit(1)   # eval gate failed → non-zero so cron/callers can tell
+        sys.exit(1)  # eval gate failed → non-zero so cron/callers can tell
 
 
 if __name__ == "__main__":

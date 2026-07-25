@@ -36,12 +36,8 @@ def _load(module_name, path):
     return module
 
 
-sdk_agent = _load(
-    "cache_sdk_agent", REPO_ROOT / "builders" / "claude-sdk" / "example.agent.py"
-)
-lc_agent = _load(
-    "cache_lc_agent", REPO_ROOT / "builders" / "langchain" / "example.agent.py"
-)
+sdk_agent = _load("cache_sdk_agent", REPO_ROOT / "builders" / "claude-sdk" / "example.agent.py")
+lc_agent = _load("cache_lc_agent", REPO_ROOT / "builders" / "langchain" / "example.agent.py")
 
 sys.path.insert(0, str(REPO_ROOT / "builders" / "claude-headless"))
 from run_headless import _system_prompt_file  # noqa: E402
@@ -97,9 +93,7 @@ def test_prompt_is_exactly_its_sources(assemble, sources):
     assert FIRST in out and SECOND in out
     # Whatever separator or trailing whitespace a builder uses, nothing else may survive.
     leftover = out.replace(FIRST, "").replace(SECOND, "")
-    assert (
-        leftover.strip() == ""
-    ), f"assembler injected content of its own: {leftover!r}"
+    assert leftover.strip() == "", f"assembler injected content of its own: {leftover!r}"
 
 
 @pytest.mark.parametrize("assemble", ASSEMBLERS)

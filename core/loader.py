@@ -37,7 +37,9 @@ SCHEMA_PATH = os.path.join(HERE, "charter.schema.yaml")
 
 SCHEMA_VERSION = "0.2"
 
-_EGRESS_HOST_RE = re.compile(r"^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*$")  # a domain label chain; '*.' prefix stripped before match
+_EGRESS_HOST_RE = re.compile(
+    r"^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*$"
+)  # a domain label chain; '*.' prefix stripped before match
 
 # Build the schema validator once. If the schema file can't be loaded, remember
 # why and fail closed on every charter (in validate) instead of letting any through.
@@ -68,13 +70,21 @@ def validate(doc):
     if "egress" in doc and isinstance(doc["egress"], list):
         egress = doc["egress"]
         if not egress:
-            raise CharterInvalid("egress must not be empty — give a domain list, or [any] (open) or [none] (no network)")
+            raise CharterInvalid(
+                "egress must not be empty — give a domain list, or [any] (open) or [none] (no network)"
+            )
         if "*" in egress:
-            raise CharterInvalid("egress may not contain a bare '*'; use 'any' to mean open, or list domains/patterns")
+            raise CharterInvalid(
+                "egress may not contain a bare '*'; use 'any' to mean open, or list domains/patterns"
+            )
         if "any" in egress and len(egress) != 1:
-            raise CharterInvalid("egress 'any' must be the only entry (a mixed list looks scoped but is open)")
+            raise CharterInvalid(
+                "egress 'any' must be the only entry (a mixed list looks scoped but is open)"
+            )
         if "none" in egress and len(egress) != 1:
-            raise CharterInvalid("egress 'none' must be the only entry (you can't declare no network and also allow domains)")
+            raise CharterInvalid(
+                "egress 'none' must be the only entry (you can't declare no network and also allow domains)"
+            )
         for e in egress:
             if e in ("any", "none"):
                 continue
@@ -156,14 +166,14 @@ class GovernedRuntime:
 
     def call_tool(self, name, usd=0.0, tokens=0):
         """The ONLY way the agent touches the outside world."""
-        self._check_status()                 # off switch, checked live, every step
-        if name not in self.allowed:         # tools allow-list
+        self._check_status()  # off switch, checked live, every step
+        if name not in self.allowed:  # tools allow-list
             raise ToolDenied(f"'{name}' is not in the charter's tool allow-list")
         self.steps += 1
         self.spent_usd += usd
         self.spent_tokens += tokens
-        self._check_budget()                 # hard ceilings
-        if self.on_step:                     # operator intervention point
+        self._check_budget()  # hard ceilings
+        if self.on_step:  # operator intervention point
             self.on_step(self)
         return f"<result of {name}>"
 
@@ -178,8 +188,10 @@ def demo_agent(rt):
     while True:
         for name, usd, tokens in plan:
             rt.call_tool(name, usd=usd, tokens=tokens)
-            print(f"  step {rt.steps:>2}: {name:<20} ok   "
-                  f"(spent ${rt.spent_usd:.2f}, {rt.spent_tokens} tok)")
+            print(
+                f"  step {rt.steps:>2}: {name:<20} ok   "
+                f"(spent ${rt.spent_usd:.2f}, {rt.spent_tokens} tok)"
+            )
 
 
 def banner(text):
@@ -191,13 +203,15 @@ def main():
     # Scenario 1 — the off switch actually switches, mid-run, from the registry
     banner("Scenario 1 - operator pauses the agent mid-run from the registry")
     charter = load_charter(CHARTER_PATH)
-    reg = Registry(); reg.register(charter)
+    reg = Registry()
+    reg.register(charter)
     rt = GovernedRuntime(charter, reg)
 
     def operator(rt):
         if rt.steps == 3:
             rt.reg.set_status(rt.c["id"], "paused")
             print("  << operator sets status=paused in the registry >>")
+
     rt.on_step = operator
     try:
         demo_agent(rt)
@@ -207,7 +221,8 @@ def main():
     # Scenario 2 — a runaway agent hits its budget ceiling and is killed
     banner("Scenario 2 - a runaway agent hits its budget ceiling")
     charter = load_charter(CHARTER_PATH)
-    reg = Registry(); reg.register(charter)
+    reg = Registry()
+    reg.register(charter)
     rt = GovernedRuntime(charter, reg)
     try:
         demo_agent(rt)
@@ -217,7 +232,8 @@ def main():
     # Scenario 3 — the agent tries a tool that is not in its charter
     banner("Scenario 3 - the agent tries a tool that is not in its charter")
     charter = load_charter(CHARTER_PATH)
-    reg = Registry(); reg.register(charter)
+    reg = Registry()
+    reg.register(charter)
     rt = GovernedRuntime(charter, reg)
     try:
         rt.call_tool("send_email")

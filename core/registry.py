@@ -98,10 +98,13 @@ def _table(reg):
     rows = []
     for rec in reg.all():
         c = rec["charter"]
-        rows.append((c["id"], c["owner"]["team"], c["data"]["class"],
-                     c["model"]["id"], rec["status"]))
-    w = [max(len(str(r[i])) for r in rows + [("id", "team", "data", "model", "status")])
-         for i in range(5)]
+        rows.append(
+            (c["id"], c["owner"]["team"], c["data"]["class"], c["model"]["id"], rec["status"])
+        )
+    w = [
+        max(len(str(r[i])) for r in rows + [("id", "team", "data", "model", "status")])
+        for i in range(5)
+    ]
     head = ("id", "team", "data.class", "model.id", "status")
     print("  " + "  ".join(h.ljust(w[i]) for i, h in enumerate(head)))
     print("  " + "  ".join("-" * w[i] for i in range(5)))
@@ -125,10 +128,10 @@ def main():
     # A real charter file, plus a few synthesized variants to make a varied fleet.
     base = load_charter(BASE)
     reg.register(base, source=BASE)
-    reg.register(_variant(base, "lead-enricher",     "growth",  "pii",          "claude-haiku-4-5"))
-    reg.register(_variant(base, "invoice-reconciler","finance", "confidential", "claude-opus-4-8"))
-    reg.register(_variant(base, "support-triage",    "support", "pii",          OLD_MODEL))
-    reg.register(_variant(base, "docs-indexer",      "docs",    "public",       "claude-haiku-4-5"))
+    reg.register(_variant(base, "lead-enricher", "growth", "pii", "claude-haiku-4-5"))
+    reg.register(_variant(base, "invoice-reconciler", "finance", "confidential", "claude-opus-4-8"))
+    reg.register(_variant(base, "support-triage", "support", "pii", OLD_MODEL))
+    reg.register(_variant(base, "docs-indexer", "docs", "public", "claude-haiku-4-5"))
 
     banner("The fleet")
     _table(reg)

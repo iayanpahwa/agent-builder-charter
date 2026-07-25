@@ -54,9 +54,7 @@ CHARTER = {
     "sandbox": {"isolation": "none", "persist_state": False},
     "budget": {"usd": 0.20, "steps": 8, "wall_clock_seconds": 90},
     "tools": ["fetch_url"],
-    "credentials": [
-        {"name": "api-auth", "ref": "env:ANTHROPIC_API_KEY", "scope": "anthropic api"}
-    ],
+    "credentials": [{"name": "api-auth", "ref": "env:ANTHROPIC_API_KEY", "scope": "anthropic api"}],
     "egress": ["docs.python.org"],
     "approval_tier": {"auto": ["fetch_url"], "human_approval": []},
     "data": {"class": "public", "retention_days": 7, "redact": []},
@@ -331,9 +329,7 @@ def _matches(out, v):
 
 def _not_matches(out, v):
     m = re.search(str(v), out)
-    return (m is None), (
-        None if m is None else f"matched forbidden /{v}/: {m.group(0)!r}"
-    )
+    return (m is None), (None if m is None else f"matched forbidden /{v}/: {m.group(0)!r}")
 
 
 def _contains_url(out, v):
@@ -352,9 +348,7 @@ def _valid_json(out, v):
 def _claims_cited(out, keywords):
     kws = [str(k).lower() for k in (keywords or [])]
     bad = [
-        ln
-        for ln in out.splitlines()
-        if any(k in ln.lower() for k in kws) and not _URL.search(ln)
+        ln for ln in out.splitlines() if any(k in ln.lower() for k in kws) and not _URL.search(ln)
     ]
     return (not bad), (None if not bad else f"uncited claim line: {bad[0].strip()!r}")
 
@@ -612,9 +606,7 @@ def enforcement_report(charter):
             if granted
             else ("no network tool is granted, so egress is a non-issue for this agent")
         )
-        rows.append(
-            ("block", "egress", f"enforced inside the tool — {how}; egress={egress}")
-        )
+        rows.append(("block", "egress", f"enforced inside the tool — {how}; egress={egress}"))
     rows.append(
         (
             "none",
@@ -747,16 +739,12 @@ def make_fetch_url(egress):
         by this agent's egress policy are reachable; any other scheme or host is refused (redirects
         are re-checked per hop)."""
         if not scheme_allowed(url):
-            return (
-                f"[egress denied] only http/https URLs may be fetched; refusing {url!r}"
-            )
+            return f"[egress denied] only http/https URLs may be fetched; refusing {url!r}"
         allow, reason = fetch_egress_check(url, egress)
         if not allow:
             return f"[egress denied] {reason}"
         try:
-            req = urllib.request.Request(
-                url, headers={"User-Agent": "charter-langchain-agent"}
-            )
+            req = urllib.request.Request(url, headers={"User-Agent": "charter-langchain-agent"})
             # A custom opener re-runs the scheme + egress check on every redirect hop; the default
             # opener would follow a redirect to ANY host, bypassing the allow-list.
             opener = urllib.request.build_opener(_EgressRedirectHandler(egress))
@@ -970,9 +958,7 @@ async def run(trigger, prompt):
         sys.exit(6)
     try:
         from langgraph.errors import GraphRecursionError
-    except (
-        Exception
-    ):  # noqa: BLE001 - older/newer layouts; fall back to name-based detection
+    except Exception:  # noqa: BLE001 - older/newer layouts; fall back to name-based detection
         GraphRecursionError = None
 
     try:
@@ -1054,9 +1040,7 @@ async def run(trigger, prompt):
         print(f"KILLED: wall-clock timeout {wall_clock}s hit")
     elif step_capped:
         outcome = "killed"
-        print(
-            f"KILLED: recursion_limit {recursion_limit} hit (budget.steps={budget.get('steps')})"
-        )
+        print(f"KILLED: recursion_limit {recursion_limit} hit (budget.steps={budget.get('steps')})")
     elif err is not None:
         outcome = "failed"
         print(f"FAILED: {type(err).__name__}: {err}")
@@ -1076,9 +1060,7 @@ async def run(trigger, prompt):
             cases = (yaml.safe_load(open(suite_path)) or {}).get("cases", []) or []
             allpass = True
             for case in cases:
-                for iname, ok, detail in check_all(
-                    case.get("invariants", []), result_text
-                ):
+                for iname, ok, detail in check_all(case.get("invariants", []), result_text):
                     invariants.append(
                         {
                             "case": case.get("id"),
@@ -1146,9 +1128,7 @@ def main():
         action="store_true",
         help="print the enforcement report; do not run, no tokens spent",
     )
-    ap.add_argument(
-        "--prompt", default=None, help="task prompt; default is prompts/task.md"
-    )
+    ap.add_argument("--prompt", default=None, help="task prompt; default is prompts/task.md")
     args = ap.parse_args()
 
     if args.dry_run:

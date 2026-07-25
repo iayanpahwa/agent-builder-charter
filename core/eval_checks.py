@@ -57,8 +57,9 @@ def _valid_json(out, v):
 
 def _claims_cited(out, keywords):
     kws = [str(k).lower() for k in (keywords or [])]
-    bad = [ln for ln in out.splitlines()
-           if any(k in ln.lower() for k in kws) and not _URL.search(ln)]
+    bad = [
+        ln for ln in out.splitlines() if any(k in ln.lower() for k in kws) and not _URL.search(ln)
+    ]
     return (not bad), (None if not bad else f"uncited claim line: {bad[0].strip()!r}")
 
 
@@ -77,7 +78,7 @@ def check_one(invariant, output):
     """invariant: a single-key dict like {'contains_url': True}. Returns (name, ok, detail)."""
     if not isinstance(invariant, dict) or len(invariant) != 1:
         return str(invariant), False, "malformed invariant (want a single-key mapping)"
-    (name, value), = invariant.items()
+    ((name, value),) = invariant.items()
     fn = _CHECKS.get(name)
     if fn is None:
         return name, False, f"unknown invariant type {name!r}"

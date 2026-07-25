@@ -31,12 +31,17 @@ def test_module_import_does_not_pull_in_the_sdk():
 
 # --- scoped_env: auth-mode-aware cross-shadowing guard -----------------------
 
+
 def test_api_key_mode_keeps_key_drops_oauth_token():
     # Both an API key and a stray OAuth token are present; the charter's declared
     # credential is env:ANTHROPIC_API_KEY, so api-key mode wins and the OAuth token
     # (which would otherwise ride along via the CLAUDE_ prefix) must be dropped.
-    src = {"ANTHROPIC_API_KEY": "sk-ant-real", "CLAUDE_CODE_OAUTH_TOKEN": "oauth-tok",
-           "PATH": "/usr/bin", "HOME": "/home/x"}
+    src = {
+        "ANTHROPIC_API_KEY": "sk-ant-real",
+        "CLAUDE_CODE_OAUTH_TOKEN": "oauth-tok",
+        "PATH": "/usr/bin",
+        "HOME": "/home/x",
+    }
     result = agent.scoped_env(agent.CHARTER, src=src)
     assert result["ANTHROPIC_API_KEY"] == "sk-ant-real"
     assert "CLAUDE_CODE_OAUTH_TOKEN" not in result
@@ -49,8 +54,12 @@ def test_subscription_mode_keeps_oauth_token_drops_api_key():
     ]
     # A stray ANTHROPIC_API_KEY would otherwise silently outrank the OAuth token —
     # the real footgun scoped_env exists to close.
-    src = {"ANTHROPIC_API_KEY": "sk-ant-stray", "CLAUDE_CODE_OAUTH_TOKEN": "oauth-tok",
-           "PATH": "/usr/bin", "HOME": "/home/x"}
+    src = {
+        "ANTHROPIC_API_KEY": "sk-ant-stray",
+        "CLAUDE_CODE_OAUTH_TOKEN": "oauth-tok",
+        "PATH": "/usr/bin",
+        "HOME": "/home/x",
+    }
     result = agent.scoped_env(charter, src=src)
     assert result["CLAUDE_CODE_OAUTH_TOKEN"] == "oauth-tok"
     assert "ANTHROPIC_API_KEY" not in result
@@ -71,15 +80,18 @@ def test_ambient_non_essential_secret_dropped():
 
 # --- egress_decision: mirrors builders/claude-headless/egress_guard.py's host-match rule ----
 
+
 def test_egress_allows_webfetch_to_allowlisted_host():
     allow, _ = agent.egress_decision(
-        "WebFetch", {"url": "https://docs.python.org/3/"}, ["docs.python.org"])
+        "WebFetch", {"url": "https://docs.python.org/3/"}, ["docs.python.org"]
+    )
     assert allow
 
 
 def test_egress_denies_webfetch_to_other_host():
     allow, _ = agent.egress_decision(
-        "WebFetch", {"url": "https://evil.example.com/"}, ["docs.python.org"])
+        "WebFetch", {"url": "https://evil.example.com/"}, ["docs.python.org"]
+    )
     assert not allow
 
 
@@ -87,13 +99,15 @@ def test_egress_denies_lookalike_prefix_host():
     # 'evildocs.python.org' shares a string suffix with 'docs.python.org' but is not a
     # subdomain of it (no dot before 'docs') — the dot-suffix rule must reject it.
     allow, _ = agent.egress_decision(
-        "WebFetch", {"url": "https://evildocs.python.org/"}, ["docs.python.org"])
+        "WebFetch", {"url": "https://evildocs.python.org/"}, ["docs.python.org"]
+    )
     assert not allow
 
 
 def test_egress_allows_real_subdomain():
     allow, _ = agent.egress_decision(
-        "WebFetch", {"url": "https://x.docs.python.org/"}, ["docs.python.org"])
+        "WebFetch", {"url": "https://x.docs.python.org/"}, ["docs.python.org"]
+    )
     assert allow
 
 
@@ -109,6 +123,7 @@ def test_egress_allows_websearch_under_any():
 
 # --- observability: opt-in ergonomics, off by default ----------------------
 
+
 def test_observability_defaults_off():
     # no extensions block at all -> both off (a quiet agent is the safe default)
     assert agent.observability({}) == {"stream": False, "trace": False}
@@ -120,14 +135,16 @@ def test_observability_reads_extensions():
 
 
 def test_trace_line_redacts_secret_values():
-    line = agent.trace_line("WebFetch", {"url": "https://docs.python.org/?k=sk-SECRET123"},
-                            [], ["sk-SECRET123"])
+    line = agent.trace_line(
+        "WebFetch", {"url": "https://docs.python.org/?k=sk-SECRET123"}, [], ["sk-SECRET123"]
+    )
     assert "sk-SECRET123" not in line
     assert "[REDACTED]" in line
     assert "WebFetch" in line
 
 
 # --- enforcement_report: the --dry-run honest report, no SDK import ---------
+
 
 def test_enforcement_report_is_honest_and_does_not_import_the_sdk():
     report = agent.enforcement_report(agent.CHARTER)
@@ -140,6 +157,7 @@ def test_enforcement_report_is_honest_and_does_not_import_the_sdk():
 
 
 # --- the embedded CHARTER validates against core/charter.schema.yaml --------
+
 
 def test_embedded_charter_validates(tmp_path):
     charter_file = tmp_path / "sdk-docs-researcher.charter.yaml"

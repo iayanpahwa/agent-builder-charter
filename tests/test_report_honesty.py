@@ -19,8 +19,17 @@ sys.path.insert(0, str(REPO_ROOT / "builders" / "claude-headless"))
 from run_headless import report  # noqa: E402
 
 REQUIRED_FIELDS = [
-    "status", "context", "model", "sandbox", "budget", "tools", "credentials",
-    "egress", "approval_tier", "data", "evals",
+    "status",
+    "context",
+    "model",
+    "sandbox",
+    "budget",
+    "tools",
+    "credentials",
+    "egress",
+    "approval_tier",
+    "data",
+    "evals",
 ]
 
 FULLY_POPULATED_OVERRIDES = dict(
@@ -44,9 +53,9 @@ def _charter(good_charter, **overrides):
 def _assert_total(rows):
     fields = [field for _, field, _ in rows]
     for required in REQUIRED_FIELDS:
-        assert any(f == required or f.startswith(required + ".") for f in fields), (
-            f"no row for required field {required!r} — fields present: {fields}"
-        )
+        assert any(
+            f == required or f.startswith(required + ".") for f in fields
+        ), f"no row for required field {required!r} — fields present: {fields}"
 
 
 # --- 1. Totality -------------------------------------------------------------
@@ -99,7 +108,9 @@ def test_budget_tokens_absent_when_not_set(good_charter):
 
 
 def test_approval_tier_not_enforced_with_human_approval(good_charter):
-    charter = _charter(good_charter, approval_tier={"auto": [], "human_approval": ["delete_record"]})
+    charter = _charter(
+        good_charter, approval_tier={"auto": [], "human_approval": ["delete_record"]}
+    )
     rows = report(charter)
     row = next(r for r in rows if r[1] == "approval_tier")
     assert row[0] == "none"
@@ -164,7 +175,9 @@ def test_status_is_block(good_charter):
 
 
 def test_extensions_row_present_when_declared(good_charter):
-    charter = _charter(good_charter, extensions={"human_verification": {"expected": True, "note": "x"}})
+    charter = _charter(
+        good_charter, extensions={"human_verification": {"expected": True, "note": "x"}}
+    )
     rows = report(charter)
     assert any(r[1] == "extensions" for r in rows)
 
@@ -229,7 +242,9 @@ def test_egress_other_row_absent_without_bash_or_mcp(good_charter):
 def test_egress_other_row_present_with_mcp(good_charter):
     charter = _charter(
         good_charter,
-        mcp=[{"name": "x", "server": {"type": "stdio", "command": "c", "args": []}, "allow": ["*"]}],
+        mcp=[
+            {"name": "x", "server": {"type": "stdio", "command": "c", "args": []}, "allow": ["*"]}
+        ],
     )
     rows = report(charter)
     row = next(r for r in rows if r[1] == "egress.other")

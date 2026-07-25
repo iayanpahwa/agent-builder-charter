@@ -55,8 +55,12 @@ def _run_guard(charter_path, event):
     [
         pytest.param(["none"], "https://docs.python.org/3/", "deny", id="none_denies_any_url"),
         pytest.param(["any"], "https://docs.python.org/3/", "allow", id="any_allows"),
-        pytest.param(["docs.python.org"], "https://docs.python.org/3/", "allow", id="on_list_allowed"),
-        pytest.param(["docs.python.org"], "https://evil.example.com/", "deny", id="off_list_denied"),
+        pytest.param(
+            ["docs.python.org"], "https://docs.python.org/3/", "allow", id="on_list_allowed"
+        ),
+        pytest.param(
+            ["docs.python.org"], "https://evil.example.com/", "deny", id="off_list_denied"
+        ),
     ],
 )
 def test_webfetch_egress_decision(tmp_path, good_charter, egress, url, expected):
@@ -94,7 +98,15 @@ def test_dry_run_reports_none_block_and_settings_hook(tmp_path, good_charter):
     charter_path = _write_charter(tmp_path, good_charter, tools=["WebFetch"], egress=["none"])
     env = dict(os.environ, _ZO_DOCTOR="0")
     result = subprocess.run(
-        [sys.executable, str(RUN_HEADLESS), "--charter", str(charter_path), "--dry-run", "--prompt", "x"],
+        [
+            sys.executable,
+            str(RUN_HEADLESS),
+            "--charter",
+            str(charter_path),
+            "--dry-run",
+            "--prompt",
+            "x",
+        ],
         cwd=str(REPO_ROOT),
         env=env,
         capture_output=True,
