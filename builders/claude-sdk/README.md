@@ -84,8 +84,9 @@ eval gate, and a run log.
   only under bypass; only `disallowed_tools` (the dangerous-tools deny list) actually removes a
   tool. Disclosed plainly in the `--dry-run` report.
 - **No container, no fs/net jail.** The `claude` CLI subprocess the SDK spawns runs as your
-  user; `Bash`/MCP reach the network *outside* the egress hook (which gates only
-  `WebFetch`/`WebSearch`).
+  user; MCP servers reach the network *outside* the egress hook. `Bash` is gated by the same
+  hook via `bash_allow` — narrowed to a plain `curl` at declared endpoints, and denied entirely
+  when the field is absent. That bounds where it can reach, not what the process is.
 - **`budget.usd` (`max_budget_usd`) is a client-side cost estimate**, not a metered hard wall —
   verify against your actual bill.
 

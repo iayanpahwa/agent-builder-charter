@@ -24,6 +24,7 @@ import sys
 from urllib.parse import urlparse
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "core"))
+from bash_guard import bash_decision
 from loader import load_charter
 
 # Claude Code tools that reach the network, and where the URL sits in tool_input.
@@ -70,9 +71,9 @@ def main():
     tool = event.get("tool_name", "")
     tool_input = event.get("tool_input", {}) or {}
 
-    # Only network tools are gated. Everything else ALWAYS passes — this is what keeps
-    # the hook from ever deadlocking the session (Bash/Read/Edit/Task are never denied).
-    if tool not in NET_TOOLS:
+    # Only network tools and Bash are gated. Everything else ALWAYS passes — this is what keeps
+    # the hook from ever deadlocking the session (Read/Edit/Glob are never denied).
+    if tool not in NET_TOOLS and tool != "Bash":
         decision(
             True, f"egress_guard: '{tool}' is not a network tool; egress hook does not gate it"
         )
@@ -83,6 +84,14 @@ def main():
         decision(
             False, f"egress_guard: cannot load charter ({e}); failing closed on this network call"
         )
+
+    # Bash reaches the network without going near WebFetch, so egress alone never contained it.
+    # bash_allow is the charter's answer: narrow Bash to a curl at declared endpoints. A charter
+    # that grants Bash without bash_allow gets a shell that can do nothing — fail closed, and say
+    # which field would open it.
+    if tool == "Bash":
+        ok, why = bash_decision(tool_input.get("command", ""), charter.get("bash_allow") or [])
+        decision(ok, f"egress_guard: {why}")
 
     egress = charter.get("egress", []) or []
     if "any" in egress:

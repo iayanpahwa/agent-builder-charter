@@ -29,8 +29,11 @@ ENUM = {"block", "gate", "alarm", "present", "declared", "none"}
 DISPLAY_ONLY = {"—"}  # a report marker for a field that isn't set — not an enforcement class
 
 FULLY_POPULATED_OVERRIDES = dict(
-    tools=["WebFetch", "Read"],
+    # Bash + bash_allow together: bash_allow is only meaningful when Bash is granted, so a
+    # "fully populated" charter has to grant it for the field to be exercised at all.
+    tools=["WebFetch", "Read", "Bash"],
     egress=["docs.python.org"],
+    bash_allow=[{"host": "docs.python.org", "path": "/api", "methods": ["GET"]}],
     budget={"steps": 10, "wall_clock_seconds": 120, "tokens": 50000, "usd": 0.5},
     approval_tier={"auto": ["Read"], "human_approval": ["delete_record"]},
     data={"class": "pii", "retention_days": 7, "redact": ["token"]},

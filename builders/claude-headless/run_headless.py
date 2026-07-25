@@ -251,12 +251,21 @@ def _settings_file(charter, charter_path):
     settings = {}
     egress = charter.get("egress", []) or []
     tools = charter.get("tools", []) or []
+    # Which tools the guard must see. Web tools only when egress is actually scoped ([any] means
+    # there is nothing to check). Bash whenever it is granted, regardless of egress — Bash reaches
+    # the network without touching WebFetch, so it is gated by bash_allow instead, and a charter
+    # that grants Bash without bash_allow must still be gated so the guard can refuse it.
+    matched = []
     if (NET_TOOLS & set(tools)) and egress and "any" not in egress:
+        matched += ["WebFetch", "WebSearch"]
+    if "Bash" in tools:
+        matched.append("Bash")
+    if matched:
         guard = os.path.join(HERE, "egress_guard.py")
         settings["hooks"] = {
             "PreToolUse": [
                 {
-                    "matcher": "WebFetch|WebSearch",
+                    "matcher": "|".join(matched),
                     "hooks": [
                         {"type": "command", "command": f"python3 {guard} --charter {charter_path}"}
                     ],
@@ -382,15 +391,38 @@ def report(charter):
         rows.append(("none", "egress", "open ([any]) — nothing to gate"))
     else:
         rows.append(("none", "egress", "no WebFetch/WebSearch tool — nothing to gate"))
-    _escapes = [t for t in tools if t == "Bash"]
-    if charter.get("mcp"):
-        _escapes.append("MCP servers")
+    bash_allow = charter.get("bash_allow") or []
+    if "Bash" in tools:
+        if bash_allow:
+            eps = ", ".join(f"{e['host']}{e['path']}" for e in bash_allow)
+            rows.append(
+                (
+                    "block",
+                    "bash_allow",
+                    f"a PreToolUse hook on Bash permits only a plain curl to {eps} — no pipes, "
+                    f"redirection, chaining, substitution, redirect-following, or file-writing "
+                    f"flags; one URL per command; https only. Everything else is denied. This is "
+                    f"a narrowing, not a sandbox: the process is still unisolated.",
+                )
+            )
+        else:
+            rows.append(
+                (
+                    "block",
+                    "bash_allow",
+                    "not declared, so the Bash hook denies EVERY command — Bash is granted but "
+                    "unusable. Declare bash_allow endpoints, or drop Bash from tools.",
+                )
+            )
+    # Bash is no longer listed here: it is gated by the hook above in either case — narrowed to
+    # the declared endpoints, or denied outright when bash_allow is absent.
+    _escapes = ["MCP servers"] if charter.get("mcp") else []
     if _escapes:
         rows.append(
             (
                 "none",
                 "egress.other",
-                f"{', '.join(_escapes)} reach the network OUTSIDE egress — the hook gates only WebFetch/WebSearch; a container is required to fence these",
+                f"{', '.join(_escapes)} reach the network OUTSIDE egress — the hook gates only WebFetch/WebSearch/Bash; a container is required to fence these",
             )
         )
     if charter.get("mcp"):

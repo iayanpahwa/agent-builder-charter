@@ -71,6 +71,13 @@ RE-CONFIRM each aloud before writing:
   denies WebSearch outright (a search can't be confined to hosts) — only `egress: [any]` makes
   it fire. If the brief wants both, surface the conflict and resolve it (drop WebSearch, or
   `[any]` and say plainly that's not a wall). Never ship a tool the runtime will silently deny.
+- **if `Bash` is granted, `bash_allow` is not optional.** Bash reaches the network without going
+  near `WebFetch`, so a scoped `egress` does not contain it; `bash_allow` is what does. Ask which
+  exact endpoints it needs and record them as `{host, path, methods}` — the hook then permits only
+  a plain `curl` to those, and denies everything else including pipes, redirection, chaining,
+  substitution, redirect-following, and file-writing flags. Say the endpoint list aloud and get a
+  yes. If they cannot name the endpoints, they do not need `Bash` — drop it. A charter that grants
+  `Bash` with no `bash_allow` is valid but useless: every command is denied.
 - **spend ceiling** → `budget.usd` (→ `max_budget_usd`, note it's a client-side ESTIMATE), plus
   `budget.steps` (→ `max_turns`) and `budget.wall_clock_seconds` (→ `asyncio.wait_for` +
   generator close).

@@ -106,8 +106,8 @@ credentials, log redaction, retention pruning, the eval gate, and a run log.
 
 - **Egress and the fs jail only cover tools this builder generates.** `fetch_url` and the fs tools
   are guarded; any third-party LangChain tool you add reaches the network / filesystem *outside*
-  those guards. Same class of caveat as `Bash`/MCP in the other builders — a container is required
-  to fence it. The fs jail is an application-level path check, not an OS sandbox.
+  those guards. Same class of caveat as MCP servers in the other builders — a container is
+  required to fence it. (This builder has no `Bash` tool at all, so it needs no `bash_allow`.) The fs jail is an application-level path check, not an OS sandbox.
 - **No container, no fs/net jail.** The agent runs in-process on the host.
 - **`budget.usd` is a client-side estimate**, checked after the run, not a metered hard wall.
   Verify against your actual bill.

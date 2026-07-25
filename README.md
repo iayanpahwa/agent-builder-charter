@@ -324,8 +324,10 @@ agent-builder-charter/
 **Honest limits (true for every runtime):** a dollar cap may be a no-op under subscription
 auth (and on `langchain` it's a soft post-hoc estimate, since LangGraph has no native spend
 cap); a real filesystem/network sandbox and true credential isolation need a container, not a
-flag. On the Claude runtimes, `Bash`/MCP reach the network *outside* the egress hook (which
-gates only `WebFetch`/`WebSearch`); on `langchain`, only the tools the builder generates are
+flag. On the Claude runtimes, MCP servers reach the network *outside* the egress hook (which
+gates `WebFetch`/`WebSearch`/`Bash`); `Bash` itself is gated by `bash_allow`, which narrows it
+to a plain `curl` at declared endpoints and denies every command when the field is absent — a
+narrowing, not a sandbox. On `langchain`, only the tools the builder generates are
 egress- and filesystem-checked, so a third-party LangChain tool would reach out around those
 guards. The `--dry-run` report tells you the truth per field: `block`, `declared`, or `none`
 (and `—` for a field you didn't set). We never claim a control that nothing enforces.

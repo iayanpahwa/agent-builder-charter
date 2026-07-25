@@ -74,8 +74,9 @@ builder-local **run-evals** helper lives here.
 - **Isolation (known limitation — not yet enforced):** headless scopes the *environment* (Claude
   auth + declared `env:` creds; all other host secrets dropped) but does **not** jail the
   filesystem or network. The process runs as your user — it can read any file you can (`~/.aws`,
-  dotfiles, the config dir), and `Bash`/MCP reach the network *outside* the egress hook (which
-  gates only `WebFetch`/`WebSearch`). A real fs/net jail needs a container, not a flag —
+  dotfiles, the config dir), and MCP servers reach the network *outside* the egress hook. `Bash`
+  is gated: `bash_allow` narrows it to a plain `curl` at declared endpoints, and denies every
+  command when the field is absent. A real fs/net jail still needs a container, not a flag —
   `--max-budget-usd` may likewise be a no-op under subscription auth. **Planned:** an optional
   container profile (Podman/Docker — identical on Linux and macOS) mounting only the agent dir
   plus read-only Claude auth, with network policy at the container edge.

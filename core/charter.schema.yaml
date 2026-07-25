@@ -231,9 +231,50 @@ properties:
     x-runtime: >
       The egress hook gates the web tools (WebFetch, WebSearch): WebFetch is allowed only to
       hosts on the list, WebSearch is denied under a scoped list (a search can't be confined to
-      hosts) and allowed only under [any], and [none] denies both. It does NOT fence Bash or MCP
-      servers — those reach the network outside egress, so a container is required to contain them.
+      hosts) and allowed only under [any], and [none] denies both. It does NOT fence MCP servers,
+      which reach the network outside egress — a container is required to contain those. For Bash,
+      see `bash_allow`: without it a granted Bash also reaches the network outside egress.
       Your main guard against web tools sending data somewhere they should not; see the builder report.
+
+  bash_allow:
+    type: array
+    description: >
+      The endpoints a granted `Bash` may reach, and the only thing it may do. Without this,
+      granting `Bash` silently voids a scoped `egress`: the egress hook gates WebFetch and
+      WebSearch, `curl` is neither, so the charter would describe an agent confined to a few
+      hosts while the agent could reach anything. Declaring `bash_allow` narrows Bash to a
+      single plain `curl` to these host+path pairs — no pipes, redirection, chaining, or
+      command substitution; one URL per command; an allow-list of flags; https only; no
+      redirect-following (the hop cannot be checked). Anything else is denied. Only meaningful
+      when `tools` includes `Bash`; ignored otherwise. It is a narrowing, NOT a sandbox — the
+      process is still unisolated, which needs a container.
+    items:
+      type: object
+      additionalProperties: false
+      required: [host, path]
+      properties:
+        host:
+          type: string
+          description: >
+            Exact hostname, matched via URL parsing rather than substring so that
+            `https://good.example@evil.tld/x` and `good.example.evil.tld` are both refused.
+            Not subdomain-inclusive, unlike `egress` — name each host you mean.
+        path:
+          type: string
+          pattern: "^/"
+          description: >
+            Path prefix, matched on a path boundary, so `/v1/items` permits `/v1/items` and
+            `/v1/items/42` but not `/v1/itemsX`. Query strings are unrestricted.
+        methods:
+          type: array
+          items: {type: string}
+          description: "HTTP methods permitted at this endpoint. Defaults to [GET]."
+    x-enforced: block
+    x-runtime: >
+      A PreToolUse hook on Bash runs the command through core/bash_guard.py and denies anything
+      that is not a declared-endpoint curl. Denials are returned to the model with a specific
+      reason. This closes the Bash egress gap on the Claude runtimes; langchain has no Bash tool
+      at all, so it needs none. See the builder report.
 
   # --- Plug-ins: extra capabilities, each declared so it goes through the door ---
   mcp:

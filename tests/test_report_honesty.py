@@ -224,13 +224,39 @@ def test_egress_scoped_list_notes_websearch_denied(good_charter):
 # --- 9. egress.other — Bash/MCP escape network egress entirely ------------------
 
 
-def test_egress_other_row_present_with_bash(good_charter):
+def test_bash_without_bash_allow_is_reported_as_denied_not_as_an_escape(good_charter):
+    """This used to be an `egress.other` row saying Bash reached the network outside the hook and
+    only a container could fence it. That was honest but unfixable. Bash is now gated by the same
+    hook: with no bash_allow declared, every command is denied, so the row says the field is a
+    block and the tool is unusable rather than that the wall has a hole in it."""
     charter = _charter(good_charter, tools=["Bash"], egress=["none"])
     rows = report(charter)
-    row = next(r for r in rows if r[1] == "egress.other")
-    assert row[0] == "none"
-    assert "container" in row[2]
-    assert "Bash" in row[2]
+    assert not any(r[1] == "egress.other" for r in rows), "Bash is no longer an unfenced escape"
+    row = next(r for r in rows if r[1] == "bash_allow")
+    assert row[0] == "block"
+    assert "denies EVERY command" in row[2]
+
+
+def test_bash_with_bash_allow_names_the_permitted_endpoints(good_charter):
+    """A reader has to be able to see, from the report alone, exactly where a granted Bash can
+    reach — otherwise the field is a claim rather than a description."""
+    charter = _charter(
+        good_charter,
+        tools=["Bash"],
+        egress=["none"],
+        bash_allow=[{"host": "api.example.com", "path": "/search", "methods": ["GET"]}],
+    )
+    rows = report(charter)
+    row = next(r for r in rows if r[1] == "bash_allow")
+    assert row[0] == "block"
+    assert "api.example.com/search" in row[2]
+    assert "not a sandbox" in row[2] or "still unisolated" in row[2]
+
+
+def test_no_bash_allow_row_when_bash_is_not_granted(good_charter):
+    """The field is meaningless without the tool; a row for it would be noise."""
+    charter = _charter(good_charter, tools=["WebFetch"], egress=["docs.python.org"])
+    assert not any(r[1] == "bash_allow" for r in report(charter))
 
 
 def test_egress_other_row_absent_without_bash_or_mcp(good_charter):
