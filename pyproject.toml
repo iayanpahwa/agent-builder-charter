@@ -1,0 +1,42 @@
+# Tooling config only — this repo is not a distributable package (agents are self-contained
+# scripts, and core/ is imported by path, not installed). There is deliberately no
+# [project] table: adding one would imply `pip install`-ability that isn't the point here.
+#
+# line-length is 100, not black's default 88, because that is the width this codebase was
+# already written to. Both formatters below discover this file automatically, so an editor
+# hook or a bare `black .` now agrees with the repo instead of imposing 88 and reflowing
+# hundreds of lines on every touch.
+
+[tool.black]
+line-length = 100
+target-version = ["py39"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+# The selected sets are the ones this codebase already writes against — the inline
+# `# noqa: BLE001 / E402 / E731 / S310` comments predate this config and stay meaningful
+# only while BLE, E, and S are selected. RUF100 then flags any noqa that stops applying.
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort — import ordering
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "BLE",  # flake8-blind-except (BLE001, used deliberately with noqa in the runners)
+    "S",    # flake8-bandit (S310 on urllib, gated by the egress guard)
+    "RUF",  # ruff-specific, incl. RUF100 unused-noqa
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests assert (S101), and several must put a builder dir on sys.path before importing from
+# it (E402) — that import order is the point, not an oversight.
+"tests/*" = ["S101", "E402"]
+# The example agents are reference artifacts that generators transcribe. They exec charter-
+# declared behaviour behind explicit guards, so bandit's subprocess/urllib heuristics fire on
+# code whose safety is the guard, not the call site.
+"builders/*/example.agent.py" = ["S310", "S603", "S607"]
+"builders/claude-headless/run_headless.py" = ["S310", "S603", "S607"]
